@@ -15,7 +15,7 @@ DEFAULT_DOCS = [
 
 # --- 2. CẤU HÌNH TRANG WEB ---
 st.set_page_config(
-    page_title="AI-SafeSchool Guard - Trợ lý Phòng chống Ma túy",
+    page_title="AI-SafeSchool Guard - Trợ lý Thấu cảm & Phòng chống Ma túy",
     page_icon="🛡️",
     layout="wide"
 )
@@ -124,40 +124,42 @@ with st.sidebar:
         st.warning("⚠️ Không tìm thấy file tài liệu trong thư mục!")
     
     st.markdown("---")
-    st.info("💡 Trợ lý AI đã sẵn sàng hỗ trợ học sinh tra cứu luật và xử lý tình huống học đường.")
+    st.info("💡 Trợ lý AI đã sẵn sàng lắng nghe tâm lý, hỗ trợ tra cứu luật và xử lý tình huống học đường.")
 
-# --- 7. CẤU HÌNH NHÂN DẠNG HỆ THỐNG ---
+# --- 7. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÍCH HỢP TÂM LÝ & PHÁP LÝ) ---
 system_instruction = """
-Bạn là "AI-SafeSchool Guard", một trợ lý chuyên gia ảo thông minh về giáo dục pháp luật và phòng ngừa tệ nạn ma túy trong cơ sở giáo dục THPT.
-Nhiệm vụ của bạn:
-1. Trả lời cực kỳ chính xác dựa trên nội dung các file tài liệu đã được nạp sẵn trong hệ thống.
-2. Cung cấp thông tin chuẩn xác về Luật Phòng, chống ma túy, các mức xử phạt vi phạm hành chính, hình sự (Bộ luật Hình sự).
-3. Hỗ trợ nhận diện các loại ma túy mới, ma túy trá hình (nước vui, bánh lười, thuốc lá điện tử, tem thư, bùa lưỡi...).
-4. Đưa ra lời khuyên giáo dục, rèn luyện kỹ năng sống với thông điệp: "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
-Phong cách: Tiếng Việt chuẩn mực, gần gũi với học sinh THPT, sắc sảo, tính giáo dục cao, thấu hiểu, bảo mật.
+Bạn là "AI-SafeSchool Guard", một trợ lý chuyên gia ảo thông minh, thấu cảm về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy trong cơ sở giáo dục THPT.
+
+Nhiệm vụ và phong cách của bạn:
+1. **Lắng nghe và Thấu cảm (Sơ cứu tâm lý):** Khi học sinh chia sẻ về áp lực học tập, căng thẳng, buồn chán, cô đơn hoặc các mối quan hệ, hãy luôn đón nhận bằng sự thấu hiểu, nhẹ nhàng, không phán xét. Động viên các em và đưa ra lời khuyên tích cực để giải tỏa cảm xúc.
+2. **Nhận diện nguy cơ sớm:** Tinh tế nhận ra các dấu hiệu học sinh đang tìm cách giải tỏa áp lực bằng những con đường sai lầm (như thử chất lạ, tìm quên trong khói thuốc, nghe lời rủ rê...), từ đó khéo léo cảnh báo hiểm họa.
+3. **Tra cứu pháp luật chính xác:** Trả lời cực kỳ chính xác dựa trên nội dung các file tài liệu đã được nạp sẵn trong hệ thống (Luật Phòng, chống ma túy, các mức xử phạt hành chính, hình sự, nhận diện ma túy mới/trá hình như nước vui, bánh lười, thuốc lá điện tử, bùa lưỡi...).
+4. **Thông điệp giáo dục:** Luôn lan tỏa thông điệp: "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
+
+Phong cách: Tiếng Việt chuẩn mực, ấm áp, thấu hiểu khi trò chuyện tâm lý, nhưng đồng thời sắc sảo, vững vàng và có tính giáo dục cao khi tư vấn pháp luật.
 """
 
 # --- 8. GIAO DIỆN CHAT CHÍNH ---
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
-st.markdown("##### Hệ thống hỗ trợ tra cứu pháp luật, nhận diện ma túy trá hình & giải quyết tình huống học đường.")
+st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & nhận diện ma túy trá hình.")
 st.markdown("---")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Chào bạn! Tôi là **AI-SafeSchool Guard** – Trợ lý chuyên gia ảo về giáo dục pháp luật và phòng ngừa tệ nạn ma túy học đường. Tôi đã được nạp sẵn toàn bộ tài liệu chính thức. Bạn cần tra cứu câu hỏi, luật hay xử lý tình huống nào, hãy hỏi tôi nhé!"}
+        {"role": "assistant", "content": "Chào bạn! Tôi là **AI-SafeSchool Guard** – Người bạn đồng hành lắng nghe tâm sự, hỗ trợ giáo dục pháp luật và phòng ngừa tệ nạn ma túy học đường. Hôm nay bạn đang cảm thấy thế nào hoặc cần tra cứu vấn đề gì, hãy chia sẻ với tôi nhé!"}
     ]
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Nhập câu hỏi của bạn (ví dụ: Thế nào là chất hướng thần? hoặc tra cứu câu hỏi tình huống...)"):
+if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví dụ: Tôi đang rất áp lực... hoặc Thế nào là chất hướng thần?)"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("AI-SafeSchool Guard đang tra cứu tài liệu và phân tích..."):
+        with st.spinner("AI-SafeSchool Guard đang lắng nghe và phân tích..."):
             try:
                 contents = preloaded_files + [prompt]
                 response = client.models.generate_content(
@@ -165,7 +167,7 @@ if prompt := st.chat_input("Nhập câu hỏi của bạn (ví dụ: Thế nào 
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
-                        temperature=0.6,
+                        temperature=0.7,
                     )
                 )
                 answer = response.text
