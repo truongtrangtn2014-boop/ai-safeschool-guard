@@ -111,7 +111,7 @@ if "interaction_logs" not in st.session_state:
         {"timestamp": "2026-10-18 10:20", "category": "Nhận diện ma túy trá hình", "content": "Tra cứu thông tin về hình thức bánh lười."},
     ]
 
-# --- 7. GIAO DIỆN THANH BÊN (SIDEBAR - HIỂN THỊ KHO TÀI LIỆU) ---
+# --- 7. GIAO DIỆN THANH BÊN (SIDEBAR) ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2910/2910795.png", width=60)
     st.markdown("### 🛡️ AI-SafeSchool Guard")
@@ -129,25 +129,30 @@ with st.sidebar:
     st.markdown("---")
     st.info("💡 Trợ lý AI sẵn sàng hỗ trợ tâm lý, pháp luật cho học sinh 24/7.")
 
-# --- 8. TIÊU ĐỀ & KHUNG ĐĂNG NHẬP QUẢN TRỊ NGAY TRÊN MÀN HÌNH CHÍNH ---
+# --- 8. TIÊU ĐỀ & KHUNG ĐĂNG NHẬP QUẢN TRỊ ---
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
 st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & nhận diện ma túy trá hình.")
 
-# Đặt hộp đăng nhập quản trị ngay ở màn hình chính dưới dạng hộp mở rộng (Expander)
 with st.expander("🔒 Khu vực dành cho Nhà trường / Đăng nhập Quản trị (Admin)"):
-    admin_password_input = st.text_input("Nhập mật khẩu quản trị:", type="password", placeholder="Nhập mật khẩu...")
+    admin_password_input = st.text_input("Nhập mật khẩu quản trị:", type="password", placeholder="Nhập mật khẩu...", key="pwd_input")
     ADMIN_SECRET_KEY = "admin2026"
     is_admin_logged_in = (admin_password_input == ADMIN_SECRET_KEY)
     
     if is_admin_logged_in:
-        st.success("🔓 Đăng nhập quản trị thành công! (Kéo xuống dưới để xem báo cáo)")
+        st.success("🔓 Đăng nhập quản trị thành công!")
     elif admin_password_input != "":
         st.error("❌ Mật khẩu không chính xác!")
 
 st.markdown("---")
 
-# --- 9. NẾU ĐÃ ĐĂNG NHẬP ADMIN THÀNH CÔNG -> HIỂN THỊ BẢNG ĐIỀU KHIỂN ---
+# --- 9. NẾU ĐÃ ĐĂNG NHẬP ADMIN THÀNH CÔNG -> HIỂN THỊ BẢNG ĐIỀU KHIỂN & NÚT THOÁT ---
 if is_admin_logged_in:
+    # Nút quay lại giao diện học sinh cực kỳ tiện lợi
+    if st.button("⬅ Quay lại giao diện Trợ lý AI (Học sinh)", type="primary"):
+        # Xóa ô mật khẩu trong session state để reset trạng thái đăng nhập
+        st.session_state.pwd_input = ""
+        st.rerun()
+
     st.title("📊 Hệ thống Quản trị & Cảnh báo sớm - Admin Dashboard")
     st.markdown("##### Dành riêng cho Ban Giám hiệu, Giáo viên chủ nhiệm & Đoàn trường theo dõi xu hướng an toàn học đường.")
     st.markdown("---")
@@ -169,7 +174,7 @@ if is_admin_logged_in:
         
         st.info("💡 **Bảo mật tuyệt đối:** Dữ liệu học sinh được ẩn danh hoàn toàn, giúp nhà trường nắm bắt xu hướng tâm lý và mối lo ngại để định hướng giáo dục kịp thời.")
     
-    st.stop() # Dừng lại không hiển thị giao diện chat học sinh khi đang xem trang quản trị
+    st.stop() # Dừng lại không hiển thị giao diện chat
 
 # --- 10. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
 system_instruction = """
