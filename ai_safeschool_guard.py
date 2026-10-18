@@ -118,7 +118,7 @@ if "interaction_logs" not in st.session_state:
         {"timestamp": "2026-10-18 10:20", "category": "Nhận diện ma túy trá hình", "content": "Tra cứu thông tin về hình thức bánh lười."},
     ]
 
-# --- 7. GIAO DIỆN THANH BÊN (SIDEBAR & ADMIN TOGGLE) ---
+# --- 7. GIAO DIỆN THANH BÊN (SIDEBAR) ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2910/2910795.png", width=60)
     st.markdown("### 🛡️ AI-SafeSchool Guard")
@@ -134,11 +134,22 @@ with st.sidebar:
         st.warning("⚠️ Không tìm thấy file tài liệu trong thư mục!")
     
     st.markdown("---")
-    st.markdown("🔒 **Khu vực Quản trị Nhà trường**")
-    admin_mode = st.toggle("Bật chế độ Quản trị (Admin)")
+    st.info("💡 Trợ lý AI đã sẵn sàng hỗ trợ tâm lý, pháp luật và kết nối hệ thống quản trị nhà trường.")
 
-# --- 8. XỬ LÝ GIAO DIỆN ADMIN (NẾU BẬT TOGGLE) ---
-if admin_mode:
+# --- 8. THANH ĐIỀU HƯỚNG CHÍNH (CHUYỂN ĐỔI CHẾ ĐỘ RÕ RÀNG TRÊN MÀN HÌNH) ---
+st.title("🛡️ Trợ lý AI-SafeSchool Guard")
+st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh báo sớm.")
+
+# Tạo nút lựa chọn ngay trên màn hình chính để thầy dễ dàng demo đi thi
+app_mode = st.radio(
+    "📌 Chọn chế độ giao diện:",
+    ["💬 Giao diện Trợ lý AI (Dành cho Học sinh)", "📊 Bảng điều khiển Quản trị & Cảnh báo (Dành cho Nhà trường)"],
+    horizontal=True
+)
+st.markdown("---")
+
+# --- 9. NẾU CHỌN CHẾ ĐỘ QUẢN TRỊ (ADMIN DASHBOARD) ---
+if "Quản trị" in app_mode:
     st.title("📊 Hệ thống Quản trị & Cảnh báo sớm - Admin Dashboard")
     st.markdown("##### Dành cho Ban Giám hiệu, Giáo viên chủ nhiệm & Đoàn trường theo dõi xu hướng an toàn học đường.")
     st.markdown("---")
@@ -160,9 +171,9 @@ if admin_mode:
         
         st.info("💡 **Tính năng bảo mật:** Toàn bộ dữ liệu được ẩn danh tuyệt đối, giúp nhà trường nắm bắt xu hướng tâm lý và mối lo ngại của học sinh để điều chỉnh nội dung giáo dục kịp thời.")
     
-    st.stop() # Dừng chạy phần giao diện chat bên dưới khi đang ở chế độ Quản trị
+    st.stop() # Dừng chạy giao diện chat bên dưới
 
-# --- 9. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
+# --- 10. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
 system_instruction = """
 Bạn là "AI-SafeSchool Guard", một trợ lý chuyên gia ảo thông minh, thấu cảm về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy trong cơ sở giáo dục THPT.
 
@@ -175,11 +186,7 @@ Nhiệm vụ và phong cách của bạn:
 Phong cách: Tiếng Việt chuẩn mực, ấm áp, thấu hiểu khi trò chuyện tâm lý, nhưng đồng thời sắc sảo, vững vàng và có tính giáo dục cao khi tư vấn pháp luật.
 """
 
-# --- 10. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
-st.title("🛡️ Trợ lý AI-SafeSchool Guard")
-st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & nhận diện ma túy trá hình.")
-st.markdown("---")
-
+# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Chào bạn! Tôi là **AI-SafeSchool Guard** – Người bạn đồng hành lắng nghe tâm sự, hỗ trợ giáo dục pháp luật và phòng ngừa tệ nạn ma túy học đường. Hôm nay bạn đang cảm thấy thế nào hoặc cần tra cứu vấn đề gì, hãy chia sẻ với tôi nhé!"}
