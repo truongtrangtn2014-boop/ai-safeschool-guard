@@ -32,7 +32,7 @@ def get_base64_of_image(image_path):
 
 img_base64 = get_base64_of_image("background.png")
 
-# --- 4. CSS TÙY CHỈNH: GIAO DIỆN KÍNH MỜ (COZE STYLE) ---
+# --- 4. CSS TÙY CHỈNH: GIAO DIỆN KÍNH MỜ & TÔ VÀNG NÚT MENU ---
 custom_css = f"""
 <style>
 .stApp {{
@@ -75,6 +75,40 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
     box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
     padding: 4px;
+}}
+
+/* ======================================================== */
+/* THIẾT KẾ NÚT MỞ/ĐÓNG THANH MENU (SIDEBAR) MÀU VÀNG SIÊU NỔI BẬT */
+/* ======================================================== */
+[data-testid="collapsedControl"] {{
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    background-color: #fbbf24 !important; /* Màu vàng rực rỡ */
+    color: #0f172a !important;            /* Màu chữ/icon tối đậm tương phản */
+    border-radius: 50% !important;         /* Bo tròn thành hình tròn đẹp mắt */
+    width: 45px !important;
+    height: 45px !important;
+    box-shadow: 0 4px 15px rgba(251, 191, 36, 0.6) !important;
+    z-index: 999999;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    transition: all 0.3s ease;
+}}
+
+/* Hiệu ứng khi rê chuột vào nút vàng */
+[data-testid="collapsedControl"]:hover {{
+    transform: scale(1.1);
+    background-color: #f59e0b !important;
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.8) !important;
+}}
+
+/* Đổi màu icon bên trong nút thành màu tối rõ nét */
+[data-testid="collapsedControl"] svg {{
+    fill: #0f172a !important;
+    width: 24px !important;
+    height: 24px !important;
 }}
 </style>
 """
@@ -129,13 +163,8 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("🔒 **Cổng Quản trị Nhà trường**")
     
-    # Cơ chế bảo mật bằng mật khẩu (Chỉ chủ sở hữu / giáo viên biết)
     admin_password_input = st.text_input("Nhập mật khẩu quản trị:", type="password", placeholder="Nhập mật khẩu...")
-    
-    # Mật khẩu mẫu cài đặt cho thầy (thầy có thể đổi chữ 'admin2026' tùy ý)
     ADMIN_SECRET_KEY = "admin2026"
-    
-    # Trạng thái đăng nhập admin
     is_admin_logged_in = (admin_password_input == ADMIN_SECRET_KEY)
     
     if is_admin_logged_in:
@@ -166,7 +195,7 @@ if is_admin_logged_in:
         
         st.info("💡 **Bảo mật tuyệt đối:** Dữ liệu học sinh được ẩn danh hoàn toàn, giúp nhà trường nắm bắt xu hướng tâm lý và mối lo ngại để định hướng giáo dục kịp thời.")
     
-    st.stop() # Dừng lại không hiển thị giao diện chat học sinh khi đang ở trang quản trị
+    st.stop()
 
 # --- 9. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
 system_instruction = """
@@ -181,7 +210,7 @@ Nhiệm vụ và phong cách của bạn:
 Phong cách: Tiếng Việt chuẩn mực, ấm áp, thấu hiểu khi trò chuyện tâm lý, nhưng đồng thời sắc sảo, vững vàng và có tính giáo dục cao khi tư vấn pháp luật.
 """
 
-# --- 10. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH - HOÀN TOÀN CÔNG KHAI & SẠCH SẼ) ---
+# --- 10. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
 st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & nhận diện ma túy trá hình.")
 st.markdown("---")
@@ -200,7 +229,6 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Tự động ghi nhận log phân loại ngầm phục vụ Admin Dashboard
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     category = "Pháp luật & Ma túy mới"
     if any(kw in prompt.lower() for kw in ["áp lực", "buồn", "căng thẳng", "sợ", "cô đơn", "tâm sự", "mệt mỏi"]):
@@ -219,7 +247,7 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
             try:
                 contents = preloaded_files + [prompt]
                 response = client.models.generate_content(
-                    model='geminisurvey-3.8-flash', # giữ chuẩn model hiện tại
+                    model='gemini-2.5-flash',
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
@@ -230,18 +258,4 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             except Exception as e:
-                # Fallback chuẩn model gemini-2.5-flash hoặc tương đương nếu cần
-                try:
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=contents,
-                        config=types.GenerateContentConfig(
-                            system_instruction=system_instruction,
-                            temperature=0.7,
-                        )
-                    )
-                    answer = response.text
-                    st.markdown(answer)
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
-                except Exception as ex:
-                    st.error(f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {ex}")
+                st.error(f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {e}")
