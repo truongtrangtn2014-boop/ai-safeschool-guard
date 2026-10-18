@@ -133,16 +133,16 @@ with st.sidebar:
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
 st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh báo sớm.")
 
-# Tạo thanh chọn chế độ hiển thị rõ ràng ngay đầu trang
+# Tạo thanh chọn chế độ hiển thị rõ ràng ngay đầu trang (Đã cập nhật tên theo yêu cầu)
 mode_selection = st.radio(
     "📌 Chọn chế độ hệ thống:",
-    ["💬 Giao diện Học sinh (Chat)", "📊 Bảng điều khiển Quản trị Nhà trường (Admin)"],
+    ["💬 Trò chuyện với trợ lý AI", "📊 Admin"],
     horizontal=True
 )
 st.markdown("---")
 
 # --- 9. NẾU CHỌN QUẢN TRỊ NHÀ TRƯỜNG ---
-if "Quản trị" in mode_selection:
+if "Admin" in mode_selection:
     st.subheader("🔒 Đăng nhập bảo mật Quản trị viên")
     admin_password_input = st.text_input("Nhập mật khẩu quản trị hệ thống:", type="password", placeholder="Nhập mật khẩu...")
     ADMIN_SECRET_KEY = "admin2026"
@@ -171,7 +171,8 @@ if "Quản trị" in mode_selection:
     elif admin_password_input != "":
         st.error("❌ Mật khẩu không chính xác! Vui lòng nhập lại đúng mật khẩu quản trị.")
     else:
-        st.info("💡 Vui lòng nhập mật khẩu quản trị (`admin2026`) để mở bảng điều khiển phân tích số liệu.")
+        # Đã lược bỏ mật khẩu gợi ý ra khỏi chuỗi thông báo theo yêu cầu
+        st.info("💡 Vui lòng nhập mật khẩu quản trị để mở bảng điều khiển phân tích số liệu.")
         
     st.stop() # Dừng lại không hiển thị giao diện chat bên dưới
 
