@@ -32,7 +32,7 @@ def get_base64_of_image(image_path):
 
 img_base64 = get_base64_of_image("background.png")
 
-# --- 4. CSS TÙY CHỈNH: GIAO DIỆN KÍNH MỜ & TÔ VÀNG NÚT MENU ---
+# --- 4. CSS TÙY CHỈNH: GIAO DIỆN KÍNH MỜ (COZE STYLE) ---
 custom_css = f"""
 <style>
 .stApp {{
@@ -76,40 +76,6 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
     box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
     padding: 4px;
 }}
-
-/* ======================================================== */
-/* THIẾT KẾ NÚT MỞ/ĐÓNG THANH MENU (SIDEBAR) MÀU VÀNG SIÊU NỔI BẬT */
-/* ======================================================== */
-[data-testid="collapsedControl"] {{
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    background-color: #fbbf24 !important; /* Màu vàng rực rỡ */
-    color: #0f172a !important;            /* Màu chữ/icon tối đậm tương phản */
-    border-radius: 50% !important;         /* Bo tròn thành hình tròn đẹp mắt */
-    width: 45px !important;
-    height: 45px !important;
-    box-shadow: 0 4px 15px rgba(251, 191, 36, 0.6) !important;
-    z-index: 999999;
-    position: fixed;
-    top: 15px;
-    left: 15px;
-    transition: all 0.3s ease;
-}}
-
-/* Hiệu ứng khi rê chuột vào nút vàng */
-[data-testid="collapsedControl"]:hover {{
-    transform: scale(1.1);
-    background-color: #f59e0b !important;
-    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.8) !important;
-}}
-
-/* Đổi màu icon bên trong nút thành màu tối rõ nét */
-[data-testid="collapsedControl"] svg {{
-    fill: #0f172a !important;
-    width: 24px !important;
-    height: 24px !important;
-}}
 </style>
 """
 st.markdown(custom_css, unsafe_allow_html=True)
@@ -145,7 +111,7 @@ if "interaction_logs" not in st.session_state:
         {"timestamp": "2026-10-18 10:20", "category": "Nhận diện ma túy trá hình", "content": "Tra cứu thông tin về hình thức bánh lười."},
     ]
 
-# --- 7. THANH BÊN (SIDEBAR) & CỔNG ĐĂNG NHẬP BẢO MẬT CHO GIÁO VIÊN ---
+# --- 7. GIAO DIỆN THANH BÊN (SIDEBAR - HIỂN THỊ KHO TÀI LIỆU) ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2910/2910795.png", width=60)
     st.markdown("### 🛡️ AI-SafeSchool Guard")
@@ -161,18 +127,26 @@ with st.sidebar:
         st.warning("⚠️ Không tìm thấy file tài liệu trong thư mục!")
     
     st.markdown("---")
-    st.markdown("🔒 **Cổng Quản trị Nhà trường**")
-    
+    st.info("💡 Trợ lý AI sẵn sàng hỗ trợ tâm lý, pháp luật cho học sinh 24/7.")
+
+# --- 8. TIÊU ĐỀ & KHUNG ĐĂNG NHẬP QUẢN TRỊ NGAY TRÊN MÀN HÌNH CHÍNH ---
+st.title("🛡️ Trợ lý AI-SafeSchool Guard")
+st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & nhận diện ma túy trá hình.")
+
+# Đặt hộp đăng nhập quản trị ngay ở màn hình chính dưới dạng hộp mở rộng (Expander)
+with st.expander("🔒 Khu vực dành cho Nhà trường / Đăng nhập Quản trị (Admin)"):
     admin_password_input = st.text_input("Nhập mật khẩu quản trị:", type="password", placeholder="Nhập mật khẩu...")
     ADMIN_SECRET_KEY = "admin2026"
     is_admin_logged_in = (admin_password_input == ADMIN_SECRET_KEY)
     
     if is_admin_logged_in:
-        st.success("🔓 Đăng nhập quản trị thành công!")
+        st.success("🔓 Đăng nhập quản trị thành công! (Kéo xuống dưới để xem báo cáo)")
     elif admin_password_input != "":
         st.error("❌ Mật khẩu không chính xác!")
 
-# --- 8. NẾU ĐÃ ĐĂNG NHẬP ADMIN THÀNH CÔNG -> HIỂN THỊ BẢNG ĐIỀU KHIỂN ---
+st.markdown("---")
+
+# --- 9. NẾU ĐÃ ĐĂNG NHẬP ADMIN THÀNH CÔNG -> HIỂN THỊ BẢNG ĐIỀU KHIỂN ---
 if is_admin_logged_in:
     st.title("📊 Hệ thống Quản trị & Cảnh báo sớm - Admin Dashboard")
     st.markdown("##### Dành riêng cho Ban Giám hiệu, Giáo viên chủ nhiệm & Đoàn trường theo dõi xu hướng an toàn học đường.")
@@ -195,9 +169,9 @@ if is_admin_logged_in:
         
         st.info("💡 **Bảo mật tuyệt đối:** Dữ liệu học sinh được ẩn danh hoàn toàn, giúp nhà trường nắm bắt xu hướng tâm lý và mối lo ngại để định hướng giáo dục kịp thời.")
     
-    st.stop()
+    st.stop() # Dừng lại không hiển thị giao diện chat học sinh khi đang xem trang quản trị
 
-# --- 9. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
+# --- 10. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
 system_instruction = """
 Bạn là "AI-SafeSchool Guard", một trợ lý chuyên gia ảo thông minh, thấu cảm về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy trong cơ sở giáo dục THPT.
 
@@ -210,11 +184,7 @@ Nhiệm vụ và phong cách của bạn:
 Phong cách: Tiếng Việt chuẩn mực, ấm áp, thấu hiểu khi trò chuyện tâm lý, nhưng đồng thời sắc sảo, vững vàng và có tính giáo dục cao khi tư vấn pháp luật.
 """
 
-# --- 10. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
-st.title("🛡️ Trợ lý AI-SafeSchool Guard")
-st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & nhận diện ma túy trá hình.")
-st.markdown("---")
-
+# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Chào bạn! Tôi là **AI-SafeSchool Guard** – Người bạn đồng hành lắng nghe tâm sự, hỗ trợ giáo dục pháp luật và phòng ngừa tệ nạn ma túy học đường. Hôm nay bạn đang cảm thấy thế nào hoặc cần tra cứu vấn đề gì, hãy chia sẻ với tôi nhé!"}
