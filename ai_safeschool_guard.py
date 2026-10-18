@@ -103,7 +103,7 @@ def load_default_documents():
 loaded_docs_info = load_default_documents()
 preloaded_files = [item[1] for item in loaded_docs_info]
 
-# --- 6. KHỞI TẠO BỘ NHỚ LƯU TRỮ NHẬT KÝ TƯƠNG TÁC & TRẠNG THÁI ADMIN ---
+# --- 6. KHỞI TẠO BỘ NHỚ LƯU TRỮ NHẬT KÝ TƯƠNG TÁC ---
 if "interaction_logs" not in st.session_state:
     st.session_state.interaction_logs = [
         {"timestamp": "2026-10-18 08:30", "category": "Pháp luật & Ma túy mới", "content": "Hỏi về mức xử phạt tàng trữ thuốc lá điện tử."},
@@ -111,10 +111,7 @@ if "interaction_logs" not in st.session_state:
         {"timestamp": "2026-10-18 10:20", "category": "Nhận diện ma túy trá hình", "content": "Tra cứu thông tin về hình thức bánh lười."},
     ]
 
-if "admin_logged_in" not in st.session_state:
-    st.session_state.admin_logged_in = False
-
-# --- 7. GIAO DIỆN THANH BÊN (SIDEBAR) & CỔNG ĐĂNG NHẬP ---
+# --- 7. THANH BÊN (SIDEBAR) ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2910/2910795.png", width=60)
     st.markdown("### 🛡️ AI-SafeSchool Guard")
@@ -130,54 +127,55 @@ with st.sidebar:
         st.warning("⚠️ Không tìm thấy file tài liệu trong thư mục!")
     
     st.markdown("---")
-    st.markdown("🔒 **Cổng Quản trị Nhà trường**")
+    st.info("💡 Trợ lý AI sẵn sàng hỗ trợ tâm lý, pháp luật cho học sinh 24/7.")
+
+# --- 8. TIÊU ĐỀ & THANH CHỌN CHẾ ĐỘ RÕ RÀNG TRÊN MÀN HÌNH CHÍNH ---
+st.title("🛡️ Trợ lý AI-SafeSchool Guard")
+st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh báo sớm.")
+
+# Tạo thanh chọn chế độ hiển thị rõ ràng ngay đầu trang
+mode_selection = st.radio(
+    "📌 Chọn chế độ hệ thống:",
+    ["💬 Giao diện Học sinh (Chat)", "📊 Bảng điều khiển Quản trị Nhà trường (Admin)"],
+    horizontal=True
+)
+st.markdown("---")
+
+# --- 9. NẾU CHỌN QUẢN TRỊ NHÀ TRƯỜNG ---
+if "Quản trị" in mode_selection:
+    st.subheader("🔒 Đăng nhập bảo mật Quản trị viên")
+    admin_password_input = st.text_input("Nhập mật khẩu quản trị hệ thống:", type="password", placeholder="Nhập mật khẩu...")
+    ADMIN_SECRET_KEY = "admin2026"
     
-    if not st.session_state.admin_logged_in:
-        admin_password_input = st.text_input("Nhập mật khẩu quản trị:", type="password", placeholder="Nhập mật khẩu...")
-        ADMIN_SECRET_KEY = "admin2026"
+    if admin_password_input == ADMIN_SECRET_KEY:
+        st.success("🔓 Đăng nhập thành công! Dưới đây là Bảng điều khiển phân tích dữ liệu:")
+        st.markdown("---")
         
-        if admin_password_input == ADMIN_SECRET_KEY:
-            st.session_state.admin_logged_in = True
-            st.rerun()
-        elif admin_password_input != "":
-            st.error("❌ Mật khẩu không chính xác!")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Tổng lượt tương tác ẩn danh", len(st.session_state.interaction_logs), "+3 phiên mới")
+        col2.metric("Chủ đề học sinh quan tâm nhất", "Nhận diện ma túy trá hình", "Chiếm đa số")
+        col3.metric("Cảnh báo tâm lý cần lưu ý", "1 trường hợp", "Cần đồng hành")
+
+        st.markdown("### 📈 Biểu đồ phân bổ nhu cầu tư vấn & tra cứu của học sinh")
+        df_logs = pd.DataFrame(st.session_state.interaction_logs)
+        
+        if not df_logs.empty:
+            category_counts = df_logs["category"].value_counts()
+            st.bar_chart(category_counts)
+
+            st.markdown("### 📋 Nhật ký tương tác ẩn danh thời gian thực (Real-time Logs)")
+            st.dataframe(df_logs, use_container_width=True)
+            
+            st.info("💡 **Bảo mật tuyệt đối:** Dữ liệu học sinh được ẩn danh hoàn toàn, giúp nhà trường nắm bắt xu hướng tâm lý và mối lo ngại để định hướng giáo dục kịp thời.")
+            
+    elif admin_password_input != "":
+        st.error("❌ Mật khẩu không chính xác! Vui lòng nhập lại đúng mật khẩu quản trị.")
     else:
-        st.success("🔓 Đã đăng nhập quản trị")
-        if st.button("🚪 Đăng xuất / Thoát", type="primary"):
-            st.session_state.admin_logged_in = False
-            st.rerun()
-
-# --- 8. NẾU ĐÃ ĐĂNG NHẬP ADMIN -> HIỂN THỊ BẢNG ĐIỀU KHIỂN ---
-if st.session_state.admin_logged_in:
-    st.title("📊 Hệ thống Quản trị & Cảnh báo sớm - Admin Dashboard")
-    st.markdown("##### Dành riêng cho Ban Giám hiệu, Giáo viên chủ nhiệm & Đoàn trường theo dõi xu hướng an toàn học đường.")
-    st.markdown("---")
-
-    # Nút quay lại ngay trên màn hình chính cho tiện thao tác
-    if st.button("⬅ Quay lại giao diện Trợ lý AI (Học sinh)", type="primary"):
-        st.session_state.admin_logged_in = False
-        st.rerun()
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Tổng lượt tương tác ẩn danh", len(st.session_state.interaction_logs), "+3 phiên mới")
-    col2.metric("Chủ đề học sinh quan tâm nhất", "Nhận diện ma túy trá hình", "Chiếm đa số")
-    col3.metric("Cảnh báo tâm lý cần lưu ý", "1 trường hợp", "Cần đồng hành")
-
-    st.markdown("### 📈 Biểu đồ phân bổ nhu cầu tư vấn & tra cứu của học sinh")
-    df_logs = pd.DataFrame(st.session_state.interaction_logs)
-    
-    if not df_logs.empty:
-        category_counts = df_logs["category"].value_counts()
-        st.bar_chart(category_counts)
-
-        st.markdown("### 📋 Nhật ký tương tác ẩn danh thời gian thực (Real-time Logs)")
-        st.dataframe(df_logs, use_container_width=True)
+        st.info("💡 Vui lòng nhập mật khẩu quản trị (`admin2026`) để mở bảng điều khiển phân tích số liệu.")
         
-        st.info("💡 **Bảo mật tuyệt đối:** Dữ liệu học sinh được ẩn danh hoàn toàn, giúp nhà trường nắm bắt xu hướng tâm lý và mối lo ngại để định hướng giáo dục kịp thời.")
-    
-    st.stop() # Dừng lại không hiển thị khung chat
+    st.stop() # Dừng lại không hiển thị giao diện chat bên dưới
 
-# --- 9. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
+# --- 10. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
 system_instruction = """
 Bạn là "AI-SafeSchool Guard", một trợ lý chuyên gia ảo thông minh, thấu cảm về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy trong cơ sở giáo dục THPT.
 
@@ -190,11 +188,7 @@ Nhiệm vụ và phong cách của bạn:
 Phong cách: Tiếng Việt chuẩn mực, ấm áp, thấu hiểu khi trò chuyện tâm lý, nhưng đồng thời sắc sảo, vững vàng và có tính giáo dục cao khi tư vấn pháp luật.
 """
 
-# --- 10. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
-st.title("🛡️ Trợ lý AI-SafeSchool Guard")
-st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & nhận diện ma túy trá hình.")
-st.markdown("---")
-
+# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Chào bạn! Tôi là **AI-SafeSchool Guard** – Người bạn đồng hành lắng nghe tâm sự, hỗ trợ giáo dục pháp luật và phòng ngừa tệ nạn ma túy học đường. Hôm nay bạn đang cảm thấy thế nào hoặc cần tra cứu vấn đề gì, hãy chia sẻ với tôi nhé!"}
