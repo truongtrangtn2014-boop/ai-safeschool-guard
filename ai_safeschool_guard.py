@@ -32,24 +32,21 @@ def get_base64_of_image(image_path):
 
 img_base64 = get_base64_of_image("background.png")
 
-# --- 4. CSS TÙY CHỈNH: TỈ LỆ ẢNH NỀN & BONG BÓNG CHAT MỜ ẢO (COZE STYLE) ---
+# --- 4. CSS TÙY CHỈNH: GIAO DIỆN KÍNH MỜ (COZE STYLE) ---
 custom_css = f"""
 <style>
-/* Tinh chỉnh tỉ lệ và vị trí hiển thị hình nền */
 .stApp {{
     background: linear-gradient(rgba(5, 15, 35, 0.25), rgba(5, 15, 35, 0.25)), 
                 url("data:image/png;base64,{img_base64}") no-repeat top center fixed;
     background-size: cover;
 }}
 
-/* Thanh Sidebar kính mờ tối giản */
 [data-testid="stSidebar"] {{
     background: rgba(10, 25, 50, 0.85);
     backdrop-filter: blur(12px);
     border-right: 1px solid rgba(59, 130, 246, 0.2);
 }}
 
-/* Khung bong bóng chat thiết kế mờ ảo (Glassmorphism) */
 [data-testid="stChatMessage"] {{
     background-color: rgba(15, 23, 42, 0.65) !important;
     backdrop-filter: blur(10px);
@@ -61,20 +58,16 @@ custom_css = f"""
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }}
 
-/* Ẩn header mặc định của Streamlit */
 header {{visibility: hidden;}}
 
-/* Ép toàn bộ chữ hiển thị màu trắng sáng sắc nét */
 h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {{
     color: #ffffff !important;
 }}
 
-/* Chú thích / trích dẫn luật */
 [data-testid="stMarkdownContainer"] em, [data-testid="stMarkdownContainer"] small {{
     color: #cbd5e1 !important;
 }}
 
-/* Khung nhập tin nhắn */
 .stChatInputContainer {{
     background-color: rgba(15, 23, 42, 0.75) !important;
     backdrop-filter: blur(12px);
@@ -118,7 +111,7 @@ if "interaction_logs" not in st.session_state:
         {"timestamp": "2026-10-18 10:20", "category": "Nhận diện ma túy trá hình", "content": "Tra cứu thông tin về hình thức bánh lười."},
     ]
 
-# --- 7. GIAO DIỆN THANH BÊN (SIDEBAR) ---
+# --- 7. THANH BÊN (SIDEBAR) & CỔNG ĐĂNG NHẬP BẢO MẬT CHO GIÁO VIÊN ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2910/2910795.png", width=60)
     st.markdown("### 🛡️ AI-SafeSchool Guard")
@@ -134,24 +127,26 @@ with st.sidebar:
         st.warning("⚠️ Không tìm thấy file tài liệu trong thư mục!")
     
     st.markdown("---")
-    st.info("💡 Trợ lý AI đã sẵn sàng hỗ trợ tâm lý, pháp luật và kết nối hệ thống quản trị nhà trường.")
+    st.markdown("🔒 **Cổng Quản trị Nhà trường**")
+    
+    # Cơ chế bảo mật bằng mật khẩu (Chỉ chủ sở hữu / giáo viên biết)
+    admin_password_input = st.text_input("Nhập mật khẩu quản trị:", type="password", placeholder="Nhập mật khẩu...")
+    
+    # Mật khẩu mẫu cài đặt cho thầy (thầy có thể đổi chữ 'admin2026' tùy ý)
+    ADMIN_SECRET_KEY = "admin2026"
+    
+    # Trạng thái đăng nhập admin
+    is_admin_logged_in = (admin_password_input == ADMIN_SECRET_KEY)
+    
+    if is_admin_logged_in:
+        st.success("🔓 Đăng nhập quản trị thành công!")
+    elif admin_password_input != "":
+        st.error("❌ Mật khẩu không chính xác!")
 
-# --- 8. THANH ĐIỀU HƯỚNG CHÍNH (CHUYỂN ĐỔI CHẾ ĐỘ RÕ RÀNG TRÊN MÀN HÌNH) ---
-st.title("🛡️ Trợ lý AI-SafeSchool Guard")
-st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh báo sớm.")
-
-# Tạo nút lựa chọn ngay trên màn hình chính để thầy dễ dàng demo đi thi
-app_mode = st.radio(
-    "📌 Chọn chế độ giao diện:",
-    ["💬 Giao diện Trợ lý AI (Dành cho Học sinh)", "📊 Bảng điều khiển Quản trị & Cảnh báo (Dành cho Nhà trường)"],
-    horizontal=True
-)
-st.markdown("---")
-
-# --- 9. NẾU CHỌN CHẾ ĐỘ QUẢN TRỊ (ADMIN DASHBOARD) ---
-if "Quản trị" in app_mode:
+# --- 8. NẾU ĐÃ ĐĂNG NHẬP ADMIN THÀNH CÔNG -> HIỂN THỊ BẢNG ĐIỀU KHIỂN ---
+if is_admin_logged_in:
     st.title("📊 Hệ thống Quản trị & Cảnh báo sớm - Admin Dashboard")
-    st.markdown("##### Dành cho Ban Giám hiệu, Giáo viên chủ nhiệm & Đoàn trường theo dõi xu hướng an toàn học đường.")
+    st.markdown("##### Dành riêng cho Ban Giám hiệu, Giáo viên chủ nhiệm & Đoàn trường theo dõi xu hướng an toàn học đường.")
     st.markdown("---")
 
     col1, col2, col3 = st.columns(3)
@@ -169,11 +164,11 @@ if "Quản trị" in app_mode:
         st.markdown("### 📋 Nhật ký tương tác ẩn danh thời gian thực (Real-time Logs)")
         st.dataframe(df_logs, use_container_width=True)
         
-        st.info("💡 **Tính năng bảo mật:** Toàn bộ dữ liệu được ẩn danh tuyệt đối, giúp nhà trường nắm bắt xu hướng tâm lý và mối lo ngại của học sinh để điều chỉnh nội dung giáo dục kịp thời.")
+        st.info("💡 **Bảo mật tuyệt đối:** Dữ liệu học sinh được ẩn danh hoàn toàn, giúp nhà trường nắm bắt xu hướng tâm lý và mối lo ngại để định hướng giáo dục kịp thời.")
     
-    st.stop() # Dừng chạy giao diện chat bên dưới
+    st.stop() # Dừng lại không hiển thị giao diện chat học sinh khi đang ở trang quản trị
 
-# --- 10. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
+# --- 9. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
 system_instruction = """
 Bạn là "AI-SafeSchool Guard", một trợ lý chuyên gia ảo thông minh, thấu cảm về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy trong cơ sở giáo dục THPT.
 
@@ -186,7 +181,11 @@ Nhiệm vụ và phong cách của bạn:
 Phong cách: Tiếng Việt chuẩn mực, ấm áp, thấu hiểu khi trò chuyện tâm lý, nhưng đồng thời sắc sảo, vững vàng và có tính giáo dục cao khi tư vấn pháp luật.
 """
 
-# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
+# --- 10. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH - HOÀN TOÀN CÔNG KHAI & SẠCH SẼ) ---
+st.title("🛡️ Trợ lý AI-SafeSchool Guard")
+st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & nhận diện ma túy trá hình.")
+st.markdown("---")
+
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Chào bạn! Tôi là **AI-SafeSchool Guard** – Người bạn đồng hành lắng nghe tâm sự, hỗ trợ giáo dục pháp luật và phòng ngừa tệ nạn ma túy học đường. Hôm nay bạn đang cảm thấy thế nào hoặc cần tra cứu vấn đề gì, hãy chia sẻ với tôi nhé!"}
@@ -220,7 +219,7 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
             try:
                 contents = preloaded_files + [prompt]
                 response = client.models.generate_content(
-                    model='gemini-3.8-flash',
+                    model='geminisurvey-3.8-flash', # giữ chuẩn model hiện tại
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
@@ -231,4 +230,18 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             except Exception as e:
-                st.error(f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {e}")
+                # Fallback chuẩn model gemini-2.5-flash hoặc tương đương nếu cần
+                try:
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            temperature=0.7,
+                        )
+                    )
+                    answer = response.text
+                    st.markdown(answer)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                except Exception as ex:
+                    st.error(f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {ex}")
