@@ -82,12 +82,10 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# --- 5. TỰ ĐỘNG NẠP NGẦM 2 FILE CỐ ĐỊNH (CACHED) ---
-client = genai.Client()
-
-
+# --- 5. HÀM KHỞI TẠO CLIENT VÀ NẠP TÀI LIỆU AN TOÀN ---
 @st.cache_resource
-def load_default_documents():
+def get_gemini_client_and_files():
+  client = genai.Client()
   processed = []
   for doc_name in DEFAULT_DOCS:
     if os.path.exists(doc_name):
@@ -106,10 +104,10 @@ def load_default_documents():
         processed.append((doc_name, gemini_file))
       except Exception as e:
         print(f"Lỗi nạp file {doc_name}: {e}")
-  return processed
+  return client, processed
 
 
-loaded_docs_info = load_default_documents()
+client, loaded_docs_info = get_gemini_client_and_files()
 preloaded_files = [item[1] for item in loaded_docs_info]
 
 # --- 6. KHỞI TẠO BỘ NHỚ LƯU TRỮ NHẬT KÝ TƯƠNG TÁC ---
@@ -235,28 +233,22 @@ NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
 1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được nạp sẵn. Tuyệt đối không tự suy diễn hoặc bịa đặt ngoài tài liệu.
 2. Lắng nghe và thấu cảm: Đón nhận mọi tâm sự áp lực, căng thẳng của học sinh với thái độ nhẹ nhàng, không phán xét, khéo léo sơ cứu tâm lý.
 3. Thông điệp giáo dục: Luôn lan tỏa "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
-Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn tâm lý, sắc sảo và vững vàng khi tư vấn pháp luật dựa trên tài liệu.
+Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
 """
 
-# --- 11. KHỞI TẠO CHAT SESSION ỔN ĐỊNH (CHỐNG LỖI 503) ---
-@st.cache_resource
-def init_chat_session():
+# --- 11. KHỞI TẠO CHAT SESSION ĐỘC LẬP TRÊN SESSION_STATE ---
+if "chat_session" not in st.session_state:
   initial_contents = preloaded_files + [
       "Hãy ghi nhớ kỹ nội dung của các tài liệu được đính kèm ở trên để làm căn cứ trả lời cho các câu hỏi xuyên suốt phiên làm việc."
   ]
-  chat = client.chats.create(
+  st.session_state.chat_session = client.chats.create(
       model="gemini-3.8-flash",
       config=types.GenerateContentConfig(
           system_instruction=system_instruction,
           temperature=0.3,
       ),
   )
-  chat.send_message(initial_contents)
-  return chat
-
-
-if "chat_session" not in st.session_state:
-  st.session_state.chat_session = init_chat_session()
+  st.session_state.chat_session.send_message(initial_contents)
 
 # --- 12. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
@@ -275,8 +267,7 @@ for message in st.session_state.messages:
     st.markdown(message["content"])
 
 if prompt := st.chat_input(
-    "Nhập tâm sự hoặc câu hỏi của bạn (ví dụ: Tôi đang rất áp lực... hoặc Thế"
-    " nào là chất hướng thần?)"
+    "Nhập tâm sự hoặc câu hỏi của bạn (ví dụ: Thuốc lá điện tử có chứa ma túy không?)"
 ):
   st.session_state.messages.append({"role": "user", "content": prompt})
   with st.chat_message("user"):
@@ -303,7 +294,8 @@ if prompt := st.chat_input(
 
   with st.chat_message("assistant"):
     message_placeholder = st.empty()
-    message_placeholder.markdown("Đang phân tích và tra cứu dữ liệu từ tài liệu...")
+    # Cập nhật thông báo khi đang suy nghĩ theo đúng yêu cầu
+    message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
     try:
       response = st.session_state.chat_session.send_message(prompt)
@@ -311,6 +303,21 @@ if prompt := st.chat_input(
       message_placeholder.markdown(answer)
       st.session_state.messages.append({"role": "assistant", "content": answer})
     except Exception as e:
-      message_placeholder.error(
-          f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {e}"
-      )
+      try:
+        new_client = genai.Client()
+        st.session_state.chat_session = new_client.chats.create(
+            model="gemini-2.5-flash",
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.2,
+            ),
+        )
+        st.session_state.chat_session.send_message(preloaded_files + [prompt])
+        response = st.session_state.chat_session.send_message(prompt)
+        answer = response.text
+        message_placeholder.markdown(answer)
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+      except Exception as ex:
+        message_placeholder.error(
+            f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {ex}"
+        )
