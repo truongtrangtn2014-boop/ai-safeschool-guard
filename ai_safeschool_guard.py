@@ -236,19 +236,15 @@ NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
 Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
 """
 
-# --- 11. KHỞI TẠO CHAT SESSION ĐỘC LẬP TRÊN SESSION_STATE ---
+# --- 11. KHỞI TẠO CHAT SESSION AN TOÀN (KÈM FILE TRỰC TIẾP TRONG MỖI TIN NHẮN ĐỂ KHÔNG BỊ LỖI SERVER) ---
 if "chat_session" not in st.session_state:
-  initial_contents = preloaded_files + [
-      "Hãy ghi nhớ kỹ nội dung của các tài liệu được đính kèm ở trên để làm căn cứ trả lời cho các câu hỏi xuyên suốt phiên làm việc."
-  ]
   st.session_state.chat_session = client.chats.create(
-      model="gemini-3.8-flash",
+      model="gemini-2.5-flash",
       config=types.GenerateContentConfig(
           system_instruction=system_instruction,
-          temperature=0.3,
+          temperature=0.2,
       ),
   )
-  st.session_state.chat_session.send_message(initial_contents)
 
 # --- 12. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
@@ -294,11 +290,17 @@ if prompt := st.chat_input(
 
   with st.chat_message("assistant"):
     message_placeholder = st.empty()
-    # Cập nhật thông báo khi đang suy nghĩ theo đúng yêu cầu
     message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
     try:
-      response = st.session_state.chat_session.send_message(prompt)
+      # Truyền tệp tài liệu đi kèm trực tiếp vào nội dung tin nhắn đầu vào cùng câu hỏi của học sinh để đảm bảo ngữ cảnh luôn chính xác và không bị lỗi Server Error
+      message_payload = preloaded_files + [
+          (
+              "Dựa hoàn toàn vào các tài liệu đã đính kèm, hãy giải đáp câu hỏi"
+              f" sau của học sinh: {prompt}"
+          )
+      ]
+      response = st.session_state.chat_session.send_message(message_payload)
       answer = response.text
       message_placeholder.markdown(answer)
       st.session_state.messages.append({"role": "assistant", "content": answer})
@@ -306,14 +308,21 @@ if prompt := st.chat_input(
       try:
         new_client = genai.Client()
         st.session_state.chat_session = new_client.chats.create(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                temperature=0.2,
+                temperature=0.3,
             ),
         )
-        st.session_state.chat_session.send_message(preloaded_files + [prompt])
-        response = st.session_state.chat_session.send_message(prompt)
+        response = st.session_state.chat_session.send_message(
+            preloaded_files
+            + [
+                (
+                    "Dựa hoàn toàn vào các tài liệu đã đính kèm, hãy giải đáp"
+                    f" câu hỏi sau của học sinh: {prompt}"
+                )
+            ]
+        )
         answer = response.text
         message_placeholder.markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
