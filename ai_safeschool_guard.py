@@ -6,7 +6,7 @@ import streamlit as st
 from google import genai
 from google.genai import types
 
-# --- 1. CẤU HÌNH API KEY BẢO MẬT & 2 FILE TÀI LIỆU ---
+# --- 1. CẤU HÌNH API KEY BẢO MẬT TỪ STREAMLIT SECRETS ---
 if "GEMINI_API_KEY" in st.secrets:
   os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
 
@@ -82,7 +82,7 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# --- 5. TỰ ĐỘNG NẠP NGẦM 2 FILE CỐ ĐỊNH ---
+# --- 5. TỰ ĐỘNG NẠP NGẦM 2 FILE CỐ ĐỊNH (CACHED) ---
 client = genai.Client()
 
 
@@ -153,7 +153,7 @@ with st.sidebar:
   st.markdown("---")
   st.info("💡 Trợ lý AI sẵn sàng hỗ trợ tâm lý, pháp luật cho học sinh 24/7.")
 
-# --- 8. TIÊU ĐỀ & THANH CHỌN CHẾ ĐỘ RÕ RÀNG TRÊN MÀN HÌNH CHÍNH ---
+# --- 8. TIÊU ĐỀ & THANH CHỌN CHẾ ĐỘ ---
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
 st.markdown(
     "##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh"
@@ -167,7 +167,7 @@ mode_selection = st.radio(
 )
 st.markdown("---")
 
-# --- 9. NẾU CHỌN QUẢN TRỊ NHÀ TRƯỜNG ---
+# --- 9. QUẢN TRỊ NHÀ TRƯỜNG (ADMIN) ---
 if "Admin" in mode_selection:
   st.subheader("🔒 Đăng nhập bảo mật Quản trị viên")
   admin_password_input = st.text_input(
@@ -238,7 +238,27 @@ NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
 Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn tâm lý, sắc sảo và vững vàng khi tư vấn pháp luật dựa trên tài liệu.
 """
 
-# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
+# --- 11. KHỞI TẠO CHAT SESSION ỔN ĐỊNH (CHỐNG LỖI 503) ---
+@st.cache_resource
+def init_chat_session():
+  initial_contents = preloaded_files + [
+      "Hãy ghi nhớ kỹ nội dung của các tài liệu được đính kèm ở trên để làm căn cứ trả lời cho các câu hỏi xuyên suốt phiên làm việc."
+  ]
+  chat = client.chats.create(
+      model="gemini-3.8-flash",
+      config=types.GenerateContentConfig(
+          system_instruction=system_instruction,
+          temperature=0.3,
+      ),
+  )
+  chat.send_message(initial_contents)
+  return chat
+
+
+if "chat_session" not in st.session_state:
+  st.session_state.chat_session = init_chat_session()
+
+# --- 12. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
   st.session_state.messages = [{
       "role": "assistant",
@@ -286,29 +306,7 @@ if prompt := st.chat_input(
     message_placeholder.markdown("Đang phân tích và tra cứu dữ liệu từ tài liệu...")
 
     try:
-      # Xây dựng lịch sử trò chuyện đa lượt (Multi-turn history) để AI nhớ ngữ cảnh
-      formatted_history = []
-      recent_messages = st.session_state.messages[:-1]
-      for m in recent_messages:
-        role_mapping = "user" if m["role"] == "user" else "model"
-        formatted_history.append(
-            types.Content(
-                role=role_mapping, parts=[types.Part.from_text(text=m["content"])]
-            )
-        )
-
-      # Kết hợp tệp tài liệu, lịch sử chat và câu hỏi mới nhất
-      contents = preloaded_files + formatted_history + [prompt]
-
-      # Sử dụng model gemini-2.5-flash để đảm bảo ổn định, không bị lỗi 503 (Overloaded)
-      response = client.models.generate_content(
-          model="gemini-3.8-flash",
-          contents=contents,
-          config=types.GenerateContentConfig(
-              system_instruction=system_instruction,
-              temperature=0.2,  # Giảm xuống 0.2 để AI bám sát tuyệt đối vào tài liệu
-          ),
-      )
+      response = st.session_state.chat_session.send_message(prompt)
       answer = response.text
       message_placeholder.markdown(answer)
       st.session_state.messages.append({"role": "assistant", "content": answer})
