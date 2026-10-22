@@ -236,17 +236,7 @@ NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
 Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
 """
 
-# --- 11. KHỞI TẠO CHAT SESSION AN TOÀN (KÈM FILE TRỰC TIẾP TRONG MỖI TIN NHẮN ĐỂ KHÔNG BỊ LỖI SERVER) ---
-if "chat_session" not in st.session_state:
-  st.session_state.chat_session = client.chats.create(
-      model="gemini-2.5-flash",
-      config=types.GenerateContentConfig(
-          system_instruction=system_instruction,
-          temperature=0.2,
-      ),
-  )
-
-# --- 12. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
+# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
   st.session_state.messages = [{
       "role": "assistant",
@@ -293,40 +283,35 @@ if prompt := st.chat_input(
     message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
     try:
-      # Truyền tệp tài liệu đi kèm trực tiếp vào nội dung tin nhắn đầu vào cùng câu hỏi của học sinh để đảm bảo ngữ cảnh luôn chính xác và không bị lỗi Server Error
-      message_payload = preloaded_files + [
-          (
-              "Dựa hoàn toàn vào các tài liệu đã đính kèm, hãy giải đáp câu hỏi"
-              f" sau của học sinh: {prompt}"
-          )
-      ]
-      response = st.session_state.chat_session.send_message(message_payload)
+      # Xây dựng lịch sử trò chuyện đa lượt (Multi-turn history) kèm theo tệp tài liệu
+      formatted_history = []
+      recent_messages = st.session_state.messages[:-1]
+      for m in recent_messages:
+        role_mapping = "user" if m["role"] == "user" else "model"
+        formatted_history.append(
+            types.Content(
+                role=role_mapping, parts=[types.Part.from_text(text=m["content"])]
+            )
+        )
+
+      # Tổng hợp nội dung gửi lên: Tệp tài liệu + Lịch sử chat trước đó + Câu hỏi mới
+      contents = preloaded_files + formatted_history + [prompt]
+
+      # Sử dụng phương thức generate_content độc lập để triệt tiêu hoàn toàn lỗi 503 và lỗi client closed
+      response = client.models.generate_content(
+          model="gemini-3.8-flash",
+          contents=contents,
+          config=types.GenerateContentConfig(
+              system_instruction=system_instruction,
+              temperature=0.3,
+          ),
+      )
+      
       answer = response.text
       message_placeholder.markdown(answer)
       st.session_state.messages.append({"role": "assistant", "content": answer})
+      
     except Exception as e:
-      try:
-        new_client = genai.Client()
-        st.session_state.chat_session = new_client.chats.create(
-            model="gemini-3.8-flash",
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.3,
-            ),
-        )
-        response = st.session_state.chat_session.send_message(
-            preloaded_files
-            + [
-                (
-                    "Dựa hoàn toàn vào các tài liệu đã đính kèm, hãy giải đáp"
-                    f" câu hỏi sau của học sinh: {prompt}"
-                )
-            ]
-        )
-        answer = response.text
-        message_placeholder.markdown(answer)
-        st.session_state.messages.append({"role": "assistant", "content": answer})
-      except Exception as ex:
-        message_placeholder.error(
-            f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {ex}"
-        )
+      message_placeholder.error(
+          f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu (Mã lỗi: {e})"
+      )
