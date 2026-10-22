@@ -82,33 +82,59 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# --- 5. HÀM KHỞI TẠO CLIENT VÀ NẠP TÀI LIỆU AN TOÀN ---
+# --- 5. HÀM KHỞI TẠO CLIENT VÀ NẠP TÀI LIỆU AN TOÀN (CACHED) ---
 @st.cache_resource
-def get_gemini_client_and_files():
+def init_gemini_system():
   client = genai.Client()
-  processed = []
+  preloaded_files = []
+  loaded_info = []
+  
   for doc_name in DEFAULT_DOCS:
     if os.path.exists(doc_name):
       try:
         mime_type = (
             "application/pdf"
             if doc_name.endswith(".pdf")
-            else (
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+            else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
         with open(doc_name, "rb") as f_to_upload:
           gemini_file = client.files.upload(
               file=f_to_upload, config=types.UploadFileConfig(mime_type=mime_type)
           )
-        processed.append((doc_name, gemini_file))
+        preloaded_files.append(gemini_file)
+        loaded_info.append((doc_name, gemini_file))
       except Exception as e:
         print(f"Lỗi nạp file {doc_name}: {e}")
-  return client, processed
+        
+  system_instruction = """
+  Bạn là "AI-SafeSchool Guard", trợ lý chuyên gia ảo về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy THPT.
+  NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
+  1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được nạp sẵn. Tuyệt đối không tự suy diễn hoặc bịa đặt ngoài tài liệu.
+  2. Lắng nghe và thấu cảm: Đón nhận mọi tâm sự áp lực, căng thẳng của học sinh với thái độ nhẹ nhàng, không phán xét, khéo léo sơ cứu tâm lý.
+  3. Thông điệp giáo dục: Luôn lan tỏa "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
+  Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
+  """
+  
+  # Khởi tạo Chat Session với model gemini-2.0-flash ổn định cao
+  chat_session = client.chats.create(
+      model="gemini-3.8-flash",
+      config=types.GenerateContentConfig(
+          system_instruction=system_instruction,
+          temperature=0.2,
+      ),
+  )
+  
+  # Gửi tài liệu ngầm một lần duy nhất lúc khởi động để AI ghi nhớ ngữ cảnh
+  if preloaded_files:
+    chat_session.send_message(
+        preloaded_files + ["Hãy ghi nhớ kỹ toàn bộ nội dung trong các tài liệu đã đính kèm này để làm căn cứ trả lời xuyên suốt các câu hỏi."]
+    )
+    
+  return chat_session, loaded_info
 
 
-client, loaded_docs_info = get_gemini_client_and_files()
-preloaded_files = [item[1] for item in loaded_docs_info]
+chat_session, loaded_docs_info = init_gemini_system()
+preloaded_file_names = [item[0] for item in loaded_docs_info]
 
 # --- 6. KHỞI TẠO BỘ NHỚ LƯU TRỮ NHẬT KÝ TƯƠNG TÁC ---
 if "interaction_logs" not in st.session_state:
@@ -141,9 +167,9 @@ with st.sidebar:
   st.markdown("---")
 
   st.markdown("#### 📁 Kho tài liệu tích hợp")
-  if len(preloaded_files) > 0:
+  if len(preloaded_file_names) > 0:
     st.success("✅ Đã nạp thành công tài liệu cho học sinh!")
-    for name, _ in loaded_docs_info:
+    for name in preloaded_file_names:
       st.markdown(f"- 📄 `{name}`")
   else:
     st.warning("⚠️ Không tìm thấy file tài liệu trong thư mục!")
@@ -226,17 +252,7 @@ if "Admin" in mode_selection:
 
   st.stop()
 
-# --- 10. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (SYSTEM INSTRUCTION) ---
-system_instruction = """
-Bạn là "AI-SafeSchool Guard", trợ lý chuyên gia ảo về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy THPT.
-NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
-1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được nạp sẵn. Tuyệt đối không tự suy diễn hoặc bịa đặt ngoài tài liệu.
-2. Lắng nghe và thấu cảm: Đón nhận mọi tâm sự áp lực, căng thẳng của học sinh với thái độ nhẹ nhàng, không phán xét, khéo léo sơ cứu tâm lý.
-3. Thông điệp giáo dục: Luôn lan tỏa "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
-Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
-"""
-
-# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
+# --- 10. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
   st.session_state.messages = [{
       "role": "assistant",
@@ -280,38 +296,16 @@ if prompt := st.chat_input(
 
   with st.chat_message("assistant"):
     message_placeholder = st.empty()
+    # Hiển thị thông báo khi đang suy nghĩ theo đúng yêu cầu
     message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
     try:
-      # Xây dựng lịch sử trò chuyện đa lượt (Multi-turn history) kèm theo tệp tài liệu
-      formatted_history = []
-      recent_messages = st.session_state.messages[:-1]
-      for m in recent_messages:
-        role_mapping = "user" if m["role"] == "user" else "model"
-        formatted_history.append(
-            types.Content(
-                role=role_mapping, parts=[types.Part.from_text(text=m["content"])]
-            )
-        )
-
-      # Tổng hợp nội dung gửi lên: Tệp tài liệu + Lịch sử chat trước đó + Câu hỏi mới
-      contents = preloaded_files + formatted_history + [prompt]
-
-      # Sử dụng phương thức generate_content độc lập để triệt tiêu hoàn toàn lỗi 503 và lỗi client closed
-      response = client.models.generate_content(
-          model="gemini-3.8-flash",
-          contents=contents,
-          config=types.GenerateContentConfig(
-              system_instruction=system_instruction,
-              temperature=0.3,
-          ),
-      )
-      
+      # Gửi trực tiếp câu hỏi gọn nhẹ qua Chat Session đã lưu ngữ cảnh tài liệu sẵn trên server
+      response = chat_session.send_message(prompt)
       answer = response.text
       message_placeholder.markdown(answer)
       st.session_state.messages.append({"role": "assistant", "content": answer})
-      
     except Exception as e:
       message_placeholder.error(
-          f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu (Mã lỗi: {e})"
+          f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {e}"
       )
