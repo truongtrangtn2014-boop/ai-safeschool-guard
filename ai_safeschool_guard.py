@@ -54,7 +54,6 @@ def send_message_with_retry(chat, message):
             )
             if attempt == MAX_API_ATTEMPTS - 1 or not is_temporary_api_error(error):
                 raise
-            # Chờ 2, 4 giây (có jitter) để giảm gửi dồn khi dịch vụ quá tải.
             time.sleep((2 ** (attempt + 1)) + random.uniform(0, 0.5))
     raise RuntimeError("Không thể nhận phản hồi từ Gemini sau nhiều lần thử.")
 
@@ -166,23 +165,27 @@ def get_logs_from_db():
 # --- 6. HÀM NẠP TÀI LIỆU AN TOÀN QUA FILE API (CACHED) ---
 @st.cache_resource
 def load_default_documents(api_key):
-    client = genai.Client(api_key=api_key)
-    processed_files = []
-    processed_names = []
-    for doc_name in DEFAULT_DOCS:
-        if os.path.exists(doc_name):
-            try:
-                mime_type = "application/pdf" if doc_name.endswith(".pdf") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                with open(doc_name, "rb") as f_to_upload:
-                    gemini_file = client.files.upload(
-                        file=f_to_upload,
-                        config=types.UploadFileConfig(mime_type=mime_type)
-                    )
-                processed_files.append(gemini_file)
-                processed_names.append(doc_name)
-            except Exception as e:
-                logger.exception("Lỗi nạp tài liệu %s", doc_name)
-    return client, processed_files, processed_names
+    try:
+        client = genai.Client(api_key=api_key)
+        processed_files = []
+        processed_names = []
+        for doc_name in DEFAULT_DOCS:
+            if os.path.exists(doc_name):
+                try:
+                    mime_type = "application/pdf" if doc_name.endswith(".pdf") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    with open(doc_name, "rb") as f_to_upload:
+                        gemini_file = client.files.upload(
+                            file=f_to_upload,
+                            config=types.UploadFileConfig(mime_type=mime_type)
+                        )
+                    processed_files.append(gemini_file)
+                    processed_names.append(doc_name)
+                except Exception as e:
+                    logger.exception("Lỗi nạp tài liệu %s", doc_name)
+        return client, processed_files, processed_names
+    except Exception as e:
+        logger.exception("Không thể khởi tạo GenAI Client: %s", e)
+        return None, [], []
 
 client, preloaded_files, preloaded_file_names = load_default_documents(GEMINI_API_KEY)
 
@@ -198,6 +201,8 @@ Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn tâm lý, chu�
 
 # --- 8. KHỞI TẠO PHIÊN CHAT SESSION CHO MỖI PHIÊN LÀM VIỆC ---
 def create_chat_session():
+    if client is None:
+        raise RuntimeError("GenAI Client chưa được khởi tạo thành công.")
     chat = client.chats.create(
         model=MODEL_NAME,
         config=types.GenerateContentConfig(
@@ -322,7 +327,6 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
     try:
         add_log_to_db(current_time, category, prompt)
     except Exception:
-        # Không để lỗi cơ sở dữ liệu làm hỏng phiên trò chuyện.
         logger.exception("Không thể ghi nhật ký tương tác vào SQLite")
 
     with st.chat_message("assistant"):
@@ -330,14 +334,15 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
         message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
         try:
-            # Nếu phiên chưa được tạo hoặc đã mất, tạo phiên mới trước khi gửi.
+            if client is None:
+                raise RuntimeError("GenAI Client chưa được khởi tạo thành công. Vui lòng kiểm tra lại API Key.")
+
             if st.session_state.get("chat_session") is None:
                 st.session_state.chat_session = create_chat_session()
 
             try:
                 response = send_message_with_retry(st.session_state.chat_session, prompt)
             except Exception as first_error:
-                # Khôi phục phiên đúng một lần cho lỗi phiên/kết nối; không tự gửi lặp vô hạn.
                 logger.warning("Gửi câu hỏi thất bại; thử tạo phiên chat mới một lần: %s", first_error)
                 st.session_state.chat_session = create_chat_session()
                 response = send_message_with_retry(st.session_state.chat_session, prompt)
@@ -349,10 +354,11 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
             st.session_state.messages.append({"role": "assistant", "content": answer})
 
         except Exception as error:
-            # Ghi đầy đủ loại lỗi và traceback trong Logs; không hiển thị chi tiết kỹ thuật cho học sinh.
             logger.exception("Không thể xử lý câu hỏi qua Gemini (%s)", type(error).__name__)
-            message_placeholder.markdown(
-                "Xin lỗi bạn, trợ lý đang gặp sự cố kết nối hoặc dịch vụ AI tạm thời không khả dụng. "
-                "Bạn vui lòng chờ một chút rồi thử gửi lại nhé. Nếu bạn đang gặp nguy hiểm ngay lúc này, "
-                "hãy tìm một người lớn đáng tin cậy hoặc giáo viên để được hỗ trợ trực tiếp."
+            error_message = (
+                "Xin lỗi bạn, trợ lý đang gặp sự cố kết nối hoặc dịch vụ AI tạm thời quá tải. "
+                "Bạn vui lòng chờ khoảng 15-20 giây rồi gửi lại câu hỏi nhé. "
+                "Nếu bạn đang cần hỗ trợ khẩn cấp, hãy liên hệ ngay với thầy cô giáo hoặc bộ phận tư vấn tâm lý nhà trường."
             )
+            message_placeholder.markdown(error_message)
+            st.session_state.messages.append({"role": "assistant", "content": error_message})
