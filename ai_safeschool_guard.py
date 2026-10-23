@@ -80,12 +80,8 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# --- 5. KHỞI TẠO CLIENT VỚI CACHE ĐỂ TỐI ƯU TỐC ĐỘ KẾT NỐI ---
-@st.cache_resource
-def get_gemini_client():
-    return genai.Client()
-
-client = get_gemini_client()
+# --- 5. TỰ ĐỘNG NẠP NGẦM 2 FILE CỐ ĐỊNH ---
+client = genai.Client()
 
 @st.cache_resource
 def load_default_documents():
@@ -220,39 +216,32 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
         "content": prompt
     })
 
-    # --- LỌC TỪ KHÓA TỐI ƯU: CHỈ ĐÍNH KÈM FILE KHI HỎI VỀ LUẬT/MA TÚY ---
+    # --- TỐI ƯU TỐC ĐỘ: LỌC TỪ KHÓA ĐỂ XÁC ĐỊNH CÓ CẦN GỬI KÈM FILE TÀI LIỆU HAY KHÔNG ---
     keyword_triggers = [
         "luật", "phạt", "quy định", "ma tuý", "chất", "hướng thần", 
         "thuốc lá điện tử", "bánh", "kẹo", "nước vui", "nghị định", "điều", "tội", "hút", "sai phạm"
     ]
     need_docs = any(kw in prompt.lower() for kw in keyword_triggers)
 
+    # Nếu hỏi về luật/ma túy -> Đính kèm file. Nếu tâm sự/chào hỏi -> Chỉ gửi prompt (phản hồi siêu tốc)
     if need_docs and len(preloaded_files) > 0:
         contents = preloaded_files + [prompt]
     else:
         contents = [prompt]
 
-    # --- DÙNG STREAMING RESPONSE ĐỂ HIỆN CHỮ NGAY LẬP TỨC ---
     with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        full_answer = ""
-        try:
-            response_stream = client.models.generate_content_stream(
-                model='gemini-3.8-flash',
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.3,
+        with st.spinner("AI-SafeSchool Guard đang phản hồi..."):
+            try:
+                response = client.models.generate_content(
+                    model='gemini-3.8-flash',
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.3,
+                    )
                 )
-            )
-            
-            for chunk in response_stream:
-                if chunk.text:
-                    full_answer += chunk.text
-                    message_placeholder.markdown(full_answer + "▌")
-                    
-            message_placeholder.markdown(full_answer)
-            st.session_state.messages.append({"role": "assistant", "content": full_answer})
-            
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {e}")
+                answer = response.text
+                st.markdown(answer)
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+            except Exception as e:
+                st.error(f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {e}")
