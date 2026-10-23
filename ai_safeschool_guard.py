@@ -9,6 +9,8 @@ import pandas as pd
 import streamlit as st
 from google import genai
 from google.genai import types
+import docx
+from pypdf import PdfReader
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ai_safeschool_guard")
@@ -162,44 +164,55 @@ def get_logs_from_db():
     conn.close()
     return df
 
-# --- 6. HÀM NẠP TÀI LIỆU AN TOÀN QUA FILE API (CACHED) ---
-@st.cache_resource
-def load_default_documents(api_key):
+# --- 6. HÀM ĐỌC NỘI DUNG TÀI LIỆU TRỰC TIẾP (TỐI ƯU QUOTA) ---
+def extract_text_from_file(file_path):
+    text = ""
+    if not os.path.exists(file_path):
+        return text
     try:
-        client = genai.Client(api_key=api_key)
-        processed_files = []
-        processed_names = []
-        for doc_name in DEFAULT_DOCS:
-            if os.path.exists(doc_name):
-                try:
-                    mime_type = "application/pdf" if doc_name.endswith(".pdf") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    with open(doc_name, "rb") as f_to_upload:
-                        gemini_file = client.files.upload(
-                            file=f_to_upload,
-                            config=types.UploadFileConfig(mime_type=mime_type)
-                        )
-                    processed_files.append(gemini_file)
-                    processed_names.append(doc_name)
-                except Exception as e:
-                    logger.exception("Lỗi nạp tài liệu %s", doc_name)
-        return client, processed_files, processed_names
+        if file_path.endswith(".docx"):
+            doc = docx.Document(file_path)
+            text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+        elif file_path.endswith(".pdf"):
+            reader = PdfReader(file_path)
+            for page in reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
     except Exception as e:
-        logger.exception("Không thể khởi tạo GenAI Client: %s", e)
-        return None, [], []
+        logger.exception("Lỗi khi đọc file %s", file_path)
+    return text
 
-client, preloaded_files, preloaded_file_names = load_default_documents(GEMINI_API_KEY)
+preloaded_file_names = []
+combined_docs_content = ""
 
-# --- 7. CẤU HÌNH NHÂN DẠNG HỆ THỐNG ---
-system_instruction = """
+for doc_name in DEFAULT_DOCS:
+    file_content = extract_text_from_file(doc_name)
+    if file_content:
+        preloaded_file_names.append(doc_name)
+        combined_docs_content += f"\n\n--- TÀI LIỆU: {doc_name} ---\n{file_content}"
+
+try:
+    client = genai.Client(api_key=GEMINI_API_KEY)
+except Exception as e:
+    logger.exception("Không thể khởi tạo GenAI Client: %s", e)
+    client = None
+
+# --- 7. CẤU HÌNH NHÂN DẠNG HỆ THỐNG KÈM TÀI LIỆU ---
+system_instruction = f"""
 Bạn là "AI-SafeSchool Guard", trợ lý chuyên gia ảo về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy THPT.
 NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
-1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được cung cấp. Tuyệt đối không tự suy diễn hoặc lấy thông tin ngoài tài liệu.
+1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong phần tài liệu cơ sở được cung cấp dưới đây. Tuyệt đối không tự suy diễn hoặc lấy thông tin ngoài tài liệu.
 2. Lắng nghe và thấu cảm: Đón nhận mọi tâm sự áp lực, căng thẳng của học sinh với thái độ nhẹ nhàng, không phán xét, khéo léo sơ cứu tâm lý.
 3. Thông điệp giáo dục: Luôn lan tỏa "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
 Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn tâm lý, chuẩn xác khi trích dẫn pháp luật.
+
+--- NỘI DUNG TÀI LIỆU CƠ SỞ ---
+{combined_docs_content}
+---------------------------------
 """
 
-# --- 8. KHỞI TẠO PHIÊN CHAT SESSION CHO MỖI PHIÊN LÀM VIỆC ---
+# --- 8. KHỞI TẠO PHIÊN CHAT SESSION ---
 def create_chat_session():
     if client is None:
         raise RuntimeError("GenAI Client chưa được khởi tạo thành công.")
@@ -210,11 +223,6 @@ def create_chat_session():
             temperature=0.2,
         )
     )
-    if preloaded_files:
-        send_message_with_retry(
-            chat,
-            preloaded_files + ["Hãy đọc kỹ các tài liệu trên để làm căn cứ trả lời xuyên suốt."]
-        )
     return chat
 
 
