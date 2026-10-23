@@ -230,7 +230,7 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
         contents = [prompt]
 
     with st.chat_message("assistant"):
-        with st.spinner("AI-SafeSchool Guard đang phản hồi..."):
+        with st.spinner("AI-SafeSchool Guard đang lắng nghe và suy nghĩ phản hồi..."):
             try:
                 response = client.models.generate_content(
                     model='gemini-3.8-flash',
@@ -244,4 +244,4 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             except Exception as e:
-                st.error(f"Đã xảy ra lỗi kết nối hoặc xử lý dữ liệu: {e}")
+                st.error(f"Mạng đi bị nghẽn bạn hãy đợi 10-20s để trò chuyện tiếp nhé: {e}")
