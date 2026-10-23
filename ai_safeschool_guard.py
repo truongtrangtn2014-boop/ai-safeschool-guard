@@ -4,10 +4,14 @@ import os
 import sqlite3
 import time
 import random
+import logging
 import pandas as pd
 import streamlit as st
 from google import genai
 from google.genai import types
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ai_safeschool_guard")
 
 # --- 1. CẤU HÌNH API KEY BẢO MẬT TỪ STREAMLIT SECRETS ---
 try:
@@ -24,26 +28,35 @@ if not GEMINI_API_KEY:
 
 
 def is_temporary_api_error(error):
+    """Nhận diện lỗi có khả năng tự hết sau một khoảng chờ."""
     message = str(error).lower()
     return any(token in message for token in (
         "503", "service unavailable", "overloaded", "unavailable",
         "429", "resource_exhausted", "rate limit", "500", "502", "504",
-        "internal server error", "deadline exceeded", "temporarily"
+        "internal server error", "deadline exceeded", "timeout",
+        "temporarily", "connection reset", "connection error"
     ))
 
 
 def send_message_with_retry(chat, message):
-    """Thử lại có chờ tăng dần khi Gemini tạm thời quá tải."""
-    last_error = None
+    """Gửi tin nhắn và chỉ thử lại với lỗi tạm thời; ghi lỗi gốc vào Logs."""
     for attempt in range(MAX_API_ATTEMPTS):
         try:
-            return chat.send_message(message)
+            response = chat.send_message(message)
+            if response is None or not getattr(response, "text", None):
+                raise RuntimeError("Gemini trả về phản hồi rỗng hoặc không có trường text.")
+            return response
         except Exception as error:
-            last_error = error
+            logger.warning(
+                "Gemini request failed (attempt %s/%s): %s: %s",
+                attempt + 1, MAX_API_ATTEMPTS, type(error).__name__, error,
+                exc_info=True,
+            )
             if attempt == MAX_API_ATTEMPTS - 1 or not is_temporary_api_error(error):
                 raise
+            # Chờ 2, 4 giây (có jitter) để giảm gửi dồn khi dịch vụ quá tải.
             time.sleep((2 ** (attempt + 1)) + random.uniform(0, 0.5))
-    raise last_error
+    raise RuntimeError("Không thể nhận phản hồi từ Gemini sau nhiều lần thử.")
 
 DEFAULT_DOCS = [
     "Tài liệu ma tuý học đường.docx",
@@ -168,7 +181,7 @@ def load_default_documents(api_key):
                 processed_files.append(gemini_file)
                 processed_names.append(doc_name)
             except Exception as e:
-                print(f"Lỗi nạp file {doc_name}: {e}")
+                logger.exception("Lỗi nạp tài liệu %s", doc_name)
     return client, processed_files, processed_names
 
 client, preloaded_files, preloaded_file_names = load_default_documents(GEMINI_API_KEY)
@@ -205,7 +218,7 @@ if "chat_session" not in st.session_state:
         st.session_state.chat_session = create_chat_session()
     except Exception as error:
         st.session_state.chat_session = None
-        print(f"Không thể khởi tạo phiên Gemini: {error}")
+        logger.exception("Không thể khởi tạo phiên Gemini")
 
 # --- 9. THANH BÊN (SIDEBAR) ---
 with st.sidebar:
@@ -240,9 +253,14 @@ st.markdown("---")
 if "Admin" in mode_selection:
     st.subheader("🔒 Đăng nhập bảo mật Quản trị viên")
     admin_password_input = st.text_input("Nhập mật khẩu quản trị hệ thống:", type="password", placeholder="Nhập mật khẩu...")
-    ADMIN_SECRET_KEY = "admin2026"
-    
-    if admin_password_input == ADMIN_SECRET_KEY:
+    try:
+        ADMIN_SECRET_KEY = st.secrets.get("ADMIN_PASSWORD", "")
+    except Exception:
+        ADMIN_SECRET_KEY = os.environ.get("ADMIN_PASSWORD", "")
+
+    if not ADMIN_SECRET_KEY:
+        st.warning("Chưa cấu hình ADMIN_PASSWORD trong Streamlit Secrets.")
+    elif admin_password_input == ADMIN_SECRET_KEY:
         st.success("🔓 Đăng nhập thành công! Dưới đây là Bảng điều khiển phân tích dữ liệu:")
         st.markdown("---")
         
@@ -295,28 +313,46 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     category = "Pháp luật & Ma túy mới"
-    if any(kw in prompt.lower() for kw in ["áp lực", "buồn", "căng thẳng", "sợ", "cô đơn", "tâm sự", "mệt mỏi"]):
+    prompt_lower = prompt.lower()
+    if any(kw in prompt_lower for kw in ["áp lực", "buồn", "căng thẳng", "sợ", "cô đơn", "tâm sự", "mệt mỏi"]):
         category = "Tâm lý học đường"
-    elif any(kw in prompt.lower() for kw in ["bánh", "kẹo", "nước", "thuốc lá", "chất", "hướng thần"]):
+    elif any(kw in prompt_lower for kw in ["bánh", "kẹo", "nước", "thuốc lá", "chất", "hướng thần"]):
         category = "Nhận diện ma túy trá hình"
 
-    add_log_to_db(current_time, category, prompt)
+    try:
+        add_log_to_db(current_time, category, prompt)
+    except Exception:
+        # Không để lỗi cơ sở dữ liệu làm hỏng phiên trò chuyện.
+        logger.exception("Không thể ghi nhật ký tương tác vào SQLite")
 
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
         try:
-            if st.session_state.chat_session is None:
+            # Nếu phiên chưa được tạo hoặc đã mất, tạo phiên mới trước khi gửi.
+            if st.session_state.get("chat_session") is None:
                 st.session_state.chat_session = create_chat_session()
 
-            response = send_message_with_retry(st.session_state.chat_session, prompt)
-            answer = response.text or "Mình chưa tạo được câu trả lời lần này. Bạn thử diễn đạt lại câu hỏi nhé."
+            try:
+                response = send_message_with_retry(st.session_state.chat_session, prompt)
+            except Exception as first_error:
+                # Khôi phục phiên đúng một lần cho lỗi phiên/kết nối; không tự gửi lặp vô hạn.
+                logger.warning("Gửi câu hỏi thất bại; thử tạo phiên chat mới một lần: %s", first_error)
+                st.session_state.chat_session = create_chat_session()
+                response = send_message_with_retry(st.session_state.chat_session, prompt)
+
+            answer = getattr(response, "text", None)
+            if not answer:
+                answer = "Mình chưa tạo được câu trả lời lần này. Bạn thử diễn đạt lại câu hỏi nhé."
             message_placeholder.markdown(answer)
             st.session_state.messages.append({"role": "assistant", "content": answer})
+
         except Exception as error:
-            print(f"Lỗi khi gọi Gemini: {error}")
+            # Ghi đầy đủ loại lỗi và traceback trong Logs; không hiển thị chi tiết kỹ thuật cho học sinh.
+            logger.exception("Không thể xử lý câu hỏi qua Gemini (%s)", type(error).__name__)
             message_placeholder.markdown(
-                "Xin lỗi bạn, dịch vụ AI đang quá tải hoặc kết nối tạm thời không ổn định. "
-                "Bạn vui lòng chờ khoảng 10–20 giây rồi gửi lại câu hỏi nhé."
+                "Xin lỗi bạn, trợ lý đang gặp sự cố kết nối hoặc dịch vụ AI tạm thời không khả dụng. "
+                "Bạn vui lòng chờ một chút rồi thử gửi lại nhé. Nếu bạn đang gặp nguy hiểm ngay lúc này, "
+                "hãy tìm một người lớn đáng tin cậy hoặc giáo viên để được hỗ trợ trực tiếp."
             )
