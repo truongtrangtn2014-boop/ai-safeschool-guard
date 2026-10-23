@@ -1,7 +1,6 @@
 import base64
 import datetime
 import os
-import time
 import pandas as pd
 import streamlit as st
 from google import genai
@@ -83,13 +82,14 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# --- 5. HÀM KHỞI TẠO CLIENT VÀ UPLOAD FILE AN TOÀN (CACHED) ---
+
+# --- 5. HÀM KHỞI TẠO CLIENT VÀ UPLOAD TÀI LIỆU AN TOÀN (CACHED) ---
 @st.cache_resource
 def init_gemini_environment():
   client = genai.Client()
   uploaded_files = []
   processed_names = []
-  
+
   for doc_name in DEFAULT_DOCS:
     if os.path.exists(doc_name):
       try:
@@ -106,23 +106,43 @@ def init_gemini_environment():
           processed_names.append(doc_name)
       except Exception as e:
         print(f"Lỗi nạp file {doc_name}: {e}")
-        
+
   return client, uploaded_files, processed_names
 
 
 client, preloaded_files, preloaded_file_names = init_gemini_environment()
 
-# --- 6. CẤU HÌNH HỆ THỐNG KÈM FILE NẠP SẴN ---
+# --- 6. CẤU HÌNH HỆ THỐNG ---
 system_instruction = """
 Bạn là "AI-SafeSchool Guard", trợ lý chuyên gia ảo về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy THPT.
 NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
-1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được nạp sẵn trong hệ thống. Tuyệt đối không tự suy diễn hoặc bịa đặt ngoài tài liệu.
+1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được nạp sẵn. Tuyệt đối không tự suy diễn hoặc bịa đặt ngoài tài liệu.
 2. Lắng nghe và thấu cảm: Đón nhận mọi tâm sự áp lực, căng thẳng của học sinh với thái độ nhẹ nhàng, không phán xét, khéo léo sơ cứu tâm lý.
 3. Thông điệp giáo dục: Luôn lan tỏa "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
 Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
 """
 
-# --- 7. KHỞI TẠO BỘ NHỚ LƯU TRỮ NHẬT KÝ TƯƠNG TÁC ---
+# --- 7. KHỞI TẠO CHAT SESSION ĐỘC LẬP TRÊN SESSION_STATE ---
+if "chat_session" not in st.session_state:
+  st.session_state.chat_session = client.chats.create(
+      model="gemini-2.5-flash",
+      config=types.GenerateContentConfig(
+          system_instruction=system_instruction,
+          temperature=0.2,
+      ),
+  )
+  # Nạp tài liệu ngầm một lần duy nhất vào phiên chat để AI ghi nhớ ngữ cảnh
+  if preloaded_files:
+    try:
+      st.session_state.chat_session.send_message(
+          preloaded_files + [
+              "Hãy ghi nhớ kỹ toàn bộ nội dung trong các tài liệu đã đính kèm này để làm căn cứ trả lời cho các câu hỏi tiếp theo."
+          ]
+      )
+    except Exception as e:
+      print(f"Khởi tạo ngữ cảnh tài liệu lỗi: {e}")
+
+# --- 8. KHỞI TẠO BỘ NHỚ LƯU TRỮ NHẬT KÝ TƯƠNG TÁC ---
 if "interaction_logs" not in st.session_state:
   st.session_state.interaction_logs = [
       {
@@ -142,7 +162,7 @@ if "interaction_logs" not in st.session_state:
       },
   ]
 
-# --- 8. THANH BÊN (SIDEBAR) ---
+# --- 9. THANH BÊN (SIDEBAR) ---
 with st.sidebar:
   st.image("https://cdn-icons-png.flaticon.com/512/2910/2910795.png", width=60)
   st.markdown("### 🛡️ AI-SafeSchool Guard")
@@ -163,7 +183,7 @@ with st.sidebar:
   st.markdown("---")
   st.info("💡 Trợ lý AI sẵn sàng hỗ trợ tâm lý, pháp luật cho học sinh 24/7.")
 
-# --- 9. TIÊU ĐỀ & THANH CHỌN CHẾ ĐỘ ---
+# --- 10. TIÊU ĐỀ & THANH CHỌN CHẾ ĐỘ ---
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
 st.markdown(
     "##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh"
@@ -177,7 +197,7 @@ mode_selection = st.radio(
 )
 st.markdown("---")
 
-# --- 10. QUẢN TRỊ NHÀ TRƯỜNG (ADMIN) ---
+# --- 11. QUẢN TRỊ NHÀ TRƯỜNG (ADMIN) ---
 if "Admin" in mode_selection:
   st.subheader("🔒 Đăng nhập bảo mật Quản trị viên")
   admin_password_input = st.text_input(
@@ -238,7 +258,7 @@ if "Admin" in mode_selection:
 
   st.stop()
 
-# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
+# --- 12. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
   st.session_state.messages = [{
       "role": "assistant",
@@ -283,49 +303,31 @@ if prompt := st.chat_input(
 
   with st.chat_message("assistant"):
     message_placeholder = st.empty()
+    # Hiển thị đúng thông báo đang phân tích theo yêu cầu
     message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
     try:
-      # Đưa tệp tài liệu đi kèm vào lần gọi đầu tiên hoặc gắn gọn gàng vào cấu trúc contents 
-      # để không bị lỗi định dạng ở các câu hỏi sau.
-      formatted_history = []
-      recent_messages = st.session_state.messages[-5:-1]
-      for m in recent_messages:
-        role_mapping = "user" if m["role"] == "user" else "model"
-        formatted_history.append(
-            types.Content(
-                role=role_mapping, parts=[types.Part.from_text(text=m["content"])]
-            )
-        )
-
-      # Sửa lỗi: Chỉ truyền preloaded_files ở dạng tham chiếu gọn nhẹ kết hợp lịch sử và câu hỏi mới
-      contents = preloaded_files + formatted_history + [prompt]
-
-      response = client.models.generate_content(
-          model="gemini-3.8-flash",
-          contents=contents,
-          config=types.GenerateContentConfig(
-              system_instruction=system_instruction,
-              temperature=0.2,
-          ),
-      )
-      
+      # Gửi tin nhắn gọn nhẹ thông qua Chat Session đã lưu sẵn ngữ cảnh tài liệu trên server
+      response = st.session_state.chat_session.send_message(prompt)
       answer = response.text
       message_placeholder.markdown(answer)
       st.session_state.messages.append({"role": "assistant", "content": answer})
-      
     except Exception as e:
-      # Xử lý tự động kết nối lại ngầm một lần nếu gặp sự cố mạng chớp nhoáng
+      # Nếu có sự cố kết nối, tự động tạo mới lại phiên chat ngầm và gửi lại yêu cầu để người dùng không gặp lỗi gián đoạn
       try:
-        time.sleep(1)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[prompt],
+        st.session_state.chat_session = client.chats.create(
+            model="gemini-3.8-flash",
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 temperature=0.2,
             ),
         )
+        if preloaded_files:
+          st.session_state.chat_session.send_message(preloaded_files + [prompt])
+        else:
+          st.session_state.chat_session.send_message(prompt)
+          
+        response = st.session_state.chat_session.send_message(prompt)
         answer = response.text
         message_placeholder.markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
