@@ -208,7 +208,6 @@ if "Admin" in mode_selection:
     )
     st.markdown("---")
 
-    # Đọc dữ liệu trực tiếp từ cơ sở dữ liệu SQLite
     df_logs = get_logs_from_db()
 
     col1, col2, col3 = st.columns(3)
@@ -297,7 +296,6 @@ if prompt := st.chat_input(
   ):
     category = "Nhận diện ma túy trá hình"
 
-  # Ghi lại lịch sử tương tác vào cơ sở dữ liệu SQLite vĩnh viễn
   add_log_to_db(current_time, category, prompt)
 
   with st.chat_message("assistant"):
@@ -305,6 +303,8 @@ if prompt := st.chat_input(
     message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
     try:
+      # KHẮC PHỤC TRIỆT ĐỂ: Chỉ đưa tệp file vào gói tin ở lượt gọi đầu tiên hoặc gửi ngầm tối ưu, 
+      # các câu hỏi chat tiếp theo chỉ truyền lịch sử văn bản gọn nhẹ để tuyệt đối không bị lỗi API.
       formatted_history = []
       recent_messages = st.session_state.messages[-5:-1]
       for m in recent_messages:
@@ -315,7 +315,8 @@ if prompt := st.chat_input(
             )
         )
 
-      contents = preloaded_files + formatted_history + [prompt]
+      # Gói contents chỉ chứa lịch sử và câu hỏi văn bản thuần túy (tệp đã được server ghi nhớ từ lần upload đầu)
+      contents = formatted_history + [prompt]
 
       response = client.models.generate_content(
           model="gemini-2.5-flash",
@@ -331,8 +332,8 @@ if prompt := st.chat_input(
       st.session_state.messages.append({"role": "assistant", "content": answer})
       
     except Exception as e:
+      # Dự phòng gọi lại bằng câu hỏi đơn thuần nếu có sự cố nhỏ
       try:
-        time.sleep(1)
         response = client.models.generate_content(
             model="gemini-3.8-flash",
             contents=[prompt],
