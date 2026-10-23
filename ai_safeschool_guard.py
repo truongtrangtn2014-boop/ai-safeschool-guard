@@ -83,7 +83,7 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# --- 5. HÀM KHỞI TẠO HỆ THỐNG VÀ UPLOAD TÀI LIỆU AN TOÀN (CACHED) ---
+# --- 5. HÀM KHỞI TẠO CLIENT VÀ UPLOAD FILE AN TOÀN (CACHED) ---
 @st.cache_resource
 def init_gemini_environment():
   client = genai.Client()
@@ -107,38 +107,22 @@ def init_gemini_environment():
       except Exception as e:
         print(f"Lỗi nạp file {doc_name}: {e}")
         
-  system_instruction = """
-  Bạn là "AI-SafeSchool Guard", trợ lý chuyên gia ảo về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy THPT.
-  NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
-  1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được nạp sẵn. Tuyệt đối không tự suy diễn hoặc bịa đặt ngoài tài liệu.
-  2. Lắng nghe và thấu cảm: Đón nhận mọi tâm sự áp lực, căng thẳng của học sinh với thái độ nhẹ nhàng, không phán xét, khéo léo sơ cứu tâm lý.
-  3. Thông điệp giáo dục: Luôn lan tỏa "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
-  Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
-  """
-  
-  chat_session = client.chats.create(
-      model="gemini-2.5-flash",
-      config=types.GenerateContentConfig(
-          system_instruction=system_instruction,
-          temperature=0.2,
-      ),
-  )
-  
-  # Nạp ngầm tài liệu lần đầu tiên để AI ghi nhớ ngữ cảnh trên server
-  if uploaded_files:
-    try:
-      chat_session.send_message(
-          uploaded_files + ["Hãy ghi nhớ kỹ toàn bộ nội dung trong các tài liệu đã đính kèm này để làm căn cứ trả lời xuyên suốt."]
-      )
-    except Exception as e:
-      print(f"Lỗi gửi file ban đầu vào chat session: {e}")
-      
-  return chat_session, processed_names
+  return client, uploaded_files, processed_names
 
 
-chat_session, preloaded_file_names = init_gemini_environment()
+client, preloaded_files, preloaded_file_names = init_gemini_environment()
 
-# --- 6. KHỞI TẠO BỘ NHỚ LƯU TRỮ NHẬT KÝ TƯƠNG TÁC ---
+# --- 6. CẤU HÌNH HỆ THỐNG ---
+system_instruction = """
+Bạn là "AI-SafeSchool Guard", trợ lý chuyên gia ảo về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy THPT.
+NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
+1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được nạp sẵn. Tuyệt đối không tự suy diễn hoặc bịa đặt ngoài tài liệu.
+2. Lắng nghe và thấu cảm: Đón nhận mọi tâm sự áp lực, căng thẳng của học sinh với thái độ nhẹ nhàng, không phán xét, khéo léo sơ cứu tâm lý.
+3. Thông điệp giáo dục: Luôn lan tỏa "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
+Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
+"""
+
+# --- 7. KHỞI TẠO BỘ NHỚ LƯU TRỮ NHẬT KÝ TƯƠNG TÁC ---
 if "interaction_logs" not in st.session_state:
   st.session_state.interaction_logs = [
       {
@@ -158,7 +142,7 @@ if "interaction_logs" not in st.session_state:
       },
   ]
 
-# --- 7. THANH BÊN (SIDEBAR) ---
+# --- 8. THANH BÊN (SIDEBAR) ---
 with st.sidebar:
   st.image("https://cdn-icons-png.flaticon.com/512/2910/2910795.png", width=60)
   st.markdown("### 🛡️ AI-SafeSchool Guard")
@@ -179,7 +163,7 @@ with st.sidebar:
   st.markdown("---")
   st.info("💡 Trợ lý AI sẵn sàng hỗ trợ tâm lý, pháp luật cho học sinh 24/7.")
 
-# --- 8. TIÊU ĐỀ & THANH CHỌN CHẾ ĐỘ ---
+# --- 9. TIÊU ĐỀ & THANH CHỌN CHẾ ĐỘ ---
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
 st.markdown(
     "##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh"
@@ -193,7 +177,7 @@ mode_selection = st.radio(
 )
 st.markdown("---")
 
-# --- 9. QUẢN TRỊ NHÀ TRƯỜNG (ADMIN) ---
+# --- 10. QUẢN TRỊ NHÀ TRƯỜNG (ADMIN) ---
 if "Admin" in mode_selection:
   st.subheader("🔒 Đăng nhập bảo mật Quản trị viên")
   admin_password_input = st.text_input(
@@ -254,7 +238,7 @@ if "Admin" in mode_selection:
 
   st.stop()
 
-# --- 10. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
+# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
   st.session_state.messages = [{
       "role": "assistant",
@@ -266,7 +250,7 @@ if "messages" not in st.session_state:
       ),
   }]
 
-# Hiển thị toàn bộ lịch sử trò chuyện cũ mà không bị xóa
+# Hiển thị toàn bộ lịch sử trò chuyện cũ
 for message in st.session_state.messages:
   with st.chat_message(message["role"]):
     st.markdown(message["content"])
@@ -299,27 +283,43 @@ if prompt := st.chat_input(
 
   with st.chat_message("assistant"):
     message_placeholder = st.empty()
-    # Hiển thị thông báo khi đang suy nghĩ theo đúng yêu cầu của bạn
     message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
-    response = None
     success = False
+    response = None
     max_retries = 3
 
-    # Cơ chế tự động thử lại (Retry) thông minh khi gặp lỗi quá tải 503 tạm thời từ Google Server
     for attempt in range(max_retries):
       try:
-        response = chat_session.send_message(prompt)
+        # Chỉ lấy 4 tin nhắn gần nhất làm lịch sử để giảm thiểu tối đa dung lượng payload, giúp phản hồi siêu tốc
+        formatted_history = []
+        recent_messages = st.session_state.messages[-5:-1]
+        for m in recent_messages:
+          role_mapping = "user" if m["role"] == "user" else "model"
+          formatted_history.append(
+              types.Content(
+                  role=role_mapping, parts=[types.Part.from_text(text=m["content"])]
+              )
+          )
+
+        contents = preloaded_files + formatted_history + [prompt]
+
+        response = client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.2,
+            ),
+        )
         success = True
         break
       except Exception as e:
         error_str = str(e)
         if "503" in error_str or "UNAVAILABLE" in error_str or "Overloaded" in error_str:
           if attempt < max_retries - 1:
-            message_placeholder.markdown(f"Đang thử kết nối lại lần {attempt + 2} do máy chủ bận...")
-            time.sleep(2) # Chờ 2 giây trước khi gọi lại
+            time.sleep(1.5) # Tự động chờ nhẹ nhàng và thử lại ngầm không làm phiền người dùng
             continue
-        # Nếu là lỗi khác hoặc đã hết số lần thử, ghi nhận lỗi
         response = e
         break
 
@@ -328,6 +328,7 @@ if prompt := st.chat_input(
       message_placeholder.markdown(answer)
       st.session_state.messages.append({"role": "assistant", "content": answer})
     else:
-      message_placeholder.error(
-          f"Hệ thống đang quá tải tạm thời (Lỗi 503). Vui lòng đợi vài giây rồi gửi lại câu hỏi. Chi tiết: {response}"
+      # Thông báo nhẹ nhàng, hoàn toàn ẩn đi các mã lỗi kỹ thuật
+      message_placeholder.markdown(
+          "🤖 Trợ lý đang bận xử lý yêu cầu. Bạn vui lòng bấm gửi lại câu hỏi giúp mình nhé!"
       )
