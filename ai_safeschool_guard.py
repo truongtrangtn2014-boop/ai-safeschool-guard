@@ -2,14 +2,48 @@ import base64
 import datetime
 import os
 import sqlite3
+import time
+import random
 import pandas as pd
 import streamlit as st
 from google import genai
 from google.genai import types
 
 # --- 1. CẤU HÌNH API KEY BẢO MẬT TỪ STREAMLIT SECRETS ---
-if "GEMINI_API_KEY" in st.secrets:
-    os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+try:
+    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+except Exception:
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+MODEL_NAME = "gemini-2.5-flash"
+MAX_API_ATTEMPTS = 3
+
+if not GEMINI_API_KEY:
+    st.error("Chưa cấu hình GEMINI_API_KEY. Vui lòng thêm khóa trong Streamlit Secrets.")
+    st.stop()
+
+
+def is_temporary_api_error(error):
+    message = str(error).lower()
+    return any(token in message for token in (
+        "503", "service unavailable", "overloaded", "unavailable",
+        "429", "resource_exhausted", "rate limit", "500", "502", "504",
+        "internal server error", "deadline exceeded", "temporarily"
+    ))
+
+
+def send_message_with_retry(chat, message):
+    """Thử lại có chờ tăng dần khi Gemini tạm thời quá tải."""
+    last_error = None
+    for attempt in range(MAX_API_ATTEMPTS):
+        try:
+            return chat.send_message(message)
+        except Exception as error:
+            last_error = error
+            if attempt == MAX_API_ATTEMPTS - 1 or not is_temporary_api_error(error):
+                raise
+            time.sleep((2 ** (attempt + 1)) + random.uniform(0, 0.5))
+    raise last_error
 
 DEFAULT_DOCS = [
     "Tài liệu ma tuý học đường.docx",
@@ -118,8 +152,8 @@ def get_logs_from_db():
 
 # --- 6. HÀM NẠP TÀI LIỆU AN TOÀN QUA FILE API (CACHED) ---
 @st.cache_resource
-def load_default_documents():
-    client = genai.Client()
+def load_default_documents(api_key):
+    client = genai.Client(api_key=api_key)
     processed_files = []
     processed_names = []
     for doc_name in DEFAULT_DOCS:
@@ -137,7 +171,7 @@ def load_default_documents():
                 print(f"Lỗi nạp file {doc_name}: {e}")
     return client, processed_files, processed_names
 
-client, preloaded_files, preloaded_file_names = load_default_documents()
+client, preloaded_files, preloaded_file_names = load_default_documents(GEMINI_API_KEY)
 
 # --- 7. CẤU HÌNH NHÂN DẠNG HỆ THỐNG ---
 system_instruction = """
@@ -150,22 +184,28 @@ Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn tâm lý, chu�
 """
 
 # --- 8. KHỞI TẠO PHIÊN CHAT SESSION CHO MỖI PHIÊN LÀM VIỆC ---
-if "chat_session" not in st.session_state:
-    st.session_state.chat_session = client.chats.create(
-        model="gemini-2.5-flash",
+def create_chat_session():
+    chat = client.chats.create(
+        model=MODEL_NAME,
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
             temperature=0.2,
         )
     )
-    # Nạp tài liệu vào phiên chat đúng 1 lần khi bắt đầu
     if preloaded_files:
-        try:
-            st.session_state.chat_session.send_message(
-                preloaded_files + ["Hãy đọc kỹ các tài liệu trên để làm căn cứ trả lời xuyên suốt."]
-            )
-        except Exception:
-            pass
+        send_message_with_retry(
+            chat,
+            preloaded_files + ["Hãy đọc kỹ các tài liệu trên để làm căn cứ trả lời xuyên suốt."]
+        )
+    return chat
+
+
+if "chat_session" not in st.session_state:
+    try:
+        st.session_state.chat_session = create_chat_session()
+    except Exception as error:
+        st.session_state.chat_session = None
+        print(f"Không thể khởi tạo phiên Gemini: {error}")
 
 # --- 9. THANH BÊN (SIDEBAR) ---
 with st.sidebar:
@@ -267,28 +307,16 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
         message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
         try:
-            # Gửi tin nhắn qua Chat Session đã lưu ngữ cảnh tài liệu ngầm
-            response = st.session_state.chat_session.send_message(prompt)
-            answer = response.text
+            if st.session_state.chat_session is None:
+                st.session_state.chat_session = create_chat_session()
+
+            response = send_message_with_retry(st.session_state.chat_session, prompt)
+            answer = response.text or "Mình chưa tạo được câu trả lời lần này. Bạn thử diễn đạt lại câu hỏi nhé."
             message_placeholder.markdown(answer)
             st.session_state.messages.append({"role": "assistant", "content": answer})
-        except Exception:
-            # Tự động tạo lại phiên mới nếu kết nối bị ngắt quãng
-            try:
-                st.session_state.chat_session = client.chats.create(
-                    model="gemini-3.8-flash",
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.2,
-                    )
-                )
-                if preloaded_files:
-                    st.session_state.chat_session.send_message(preloaded_files + [prompt])
-                else:
-                    st.session_state.chat_session.send_message(prompt)
-                response = st.session_state.chat_session.send_message(prompt)
-                answer = response.text
-                message_placeholder.markdown(answer)
-                st.session_state.messages.append({"role": "assistant", "content": answer})
-            except Exception:
-                message_placeholder.markdown("Xin lỗi bạn, đường truyền hiện đang bận một chút. Bạn thử gửi lại câu hỏi giúp mình nhé!")
+        except Exception as error:
+            print(f"Lỗi khi gọi Gemini: {error}")
+            message_placeholder.markdown(
+                "Xin lỗi bạn, dịch vụ AI đang quá tải hoặc kết nối tạm thời không ổn định. "
+                "Bạn vui lòng chờ khoảng 10–20 giây rồi gửi lại câu hỏi nhé."
+            )
