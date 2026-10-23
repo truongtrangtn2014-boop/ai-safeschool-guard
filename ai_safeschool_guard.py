@@ -1,6 +1,7 @@
 import base64
 import datetime
 import os
+import sqlite3
 import pandas as pd
 import streamlit as st
 from google import genai
@@ -82,14 +83,48 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
+# --- 5. KHỞI TẠO CƠ SỞ DỮ LIỆU SQLITE CHO NHẬT KÝ ---
+DB_FILE = "interaction_logs.db"
 
-# --- 5. HÀM KHỞI TẠO CLIENT VÀ UPLOAD TÀI LIỆU AN TOÀN (CACHED) ---
+def init_db():
+  conn = sqlite3.connect(DB_FILE)
+  cursor = conn.cursor()
+  cursor.execute('''
+      CREATE TABLE IF NOT EXISTS logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          timestamp TEXT,
+          category TEXT,
+          content TEXT
+      )
+  ''')
+  conn.commit()
+  conn.close()
+
+init_db()
+
+def add_log_to_db(timestamp, category, content):
+  conn = sqlite3.connect(DB_FILE)
+  cursor = conn.cursor()
+  cursor.execute(
+      "INSERT INTO logs (timestamp, category, content) VALUES (?, ?, ?)",
+      (timestamp, category, content)
+  )
+  conn.commit()
+  conn.close()
+
+def get_logs_from_db():
+  conn = sqlite3.connect(DB_FILE)
+  df = pd.read_sql_query("SELECT timestamp, category, content FROM logs ORDER BY id DESC", conn)
+  conn.close()
+  return df
+
+# --- 6. HÀM KHỞI TẠO CLIENT VÀ UPLOAD FILE AN TOÀN (CACHED) ---
 @st.cache_resource
 def init_gemini_environment():
   client = genai.Client()
   uploaded_files = []
   processed_names = []
-
+  
   for doc_name in DEFAULT_DOCS:
     if os.path.exists(doc_name):
       try:
@@ -106,13 +141,13 @@ def init_gemini_environment():
           processed_names.append(doc_name)
       except Exception as e:
         print(f"Lỗi nạp file {doc_name}: {e}")
-
+        
   return client, uploaded_files, processed_names
 
 
 client, preloaded_files, preloaded_file_names = init_gemini_environment()
 
-# --- 6. CẤU HÌNH HỆ THỐNG ---
+# --- 7. CẤU HÌNH HỆ THỐNG ---
 system_instruction = """
 Bạn là "AI-SafeSchool Guard", trợ lý chuyên gia ảo về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy THPT.
 NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
@@ -122,47 +157,7 @@ NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
 Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
 """
 
-# --- 7. KHỞI TẠO CHAT SESSION ĐỘC LẬP TRÊN SESSION_STATE ---
-if "chat_session" not in st.session_state:
-  st.session_state.chat_session = client.chats.create(
-      model="gemini-2.5-flash",
-      config=types.GenerateContentConfig(
-          system_instruction=system_instruction,
-          temperature=0.2,
-      ),
-  )
-  # Nạp tài liệu ngầm một lần duy nhất vào phiên chat để AI ghi nhớ ngữ cảnh
-  if preloaded_files:
-    try:
-      st.session_state.chat_session.send_message(
-          preloaded_files + [
-              "Hãy ghi nhớ kỹ toàn bộ nội dung trong các tài liệu đã đính kèm này để làm căn cứ trả lời cho các câu hỏi tiếp theo."
-          ]
-      )
-    except Exception as e:
-      print(f"Khởi tạo ngữ cảnh tài liệu lỗi: {e}")
-
-# --- 8. KHỞI TẠO BỘ NHỚ LƯU TRỮ NHẬT KÝ TƯƠNG TÁC ---
-if "interaction_logs" not in st.session_state:
-  st.session_state.interaction_logs = [
-      {
-          "timestamp": "2026-10-18 08:30",
-          "category": "Pháp luật & Ma túy mới",
-          "content": "Hỏi về mức xử phạt tàng trữ thuốc lá điện tử.",
-      },
-      {
-          "timestamp": "2026-10-18 09:15",
-          "category": "Tâm lý học đường",
-          "content": "Chia sẻ áp lực học tập và cảm giác căng thẳng.",
-      },
-      {
-          "timestamp": "2026-10-18 10:20",
-          "category": "Nhận diện ma túy trá hình",
-          "content": "Tra cứu thông tin về hình thức bánh lười.",
-      },
-  ]
-
-# --- 9. THANH BÊN (SIDEBAR) ---
+# --- 8. THANH BÊN (SIDEBAR) ---
 with st.sidebar:
   st.image("https://cdn-icons-png.flaticon.com/512/2910/2910795.png", width=60)
   st.markdown("### 🛡️ AI-SafeSchool Guard")
@@ -183,7 +178,7 @@ with st.sidebar:
   st.markdown("---")
   st.info("💡 Trợ lý AI sẵn sàng hỗ trợ tâm lý, pháp luật cho học sinh 24/7.")
 
-# --- 10. TIÊU ĐỀ & THANH CHỌN CHẾ ĐỘ ---
+# --- 9. TIÊU ĐỀ & THANH CHỌN CHẾ ĐỘ ---
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
 st.markdown(
     "##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh"
@@ -197,7 +192,7 @@ mode_selection = st.radio(
 )
 st.markdown("---")
 
-# --- 11. QUẢN TRỊ NHÀ TRƯỜNG (ADMIN) ---
+# --- 10. QUẢN TRỊ NHÀ TRƯỜNG (ADMIN) ---
 if "Admin" in mode_selection:
   st.subheader("🔒 Đăng nhập bảo mật Quản trị viên")
   admin_password_input = st.text_input(
@@ -213,15 +208,23 @@ if "Admin" in mode_selection:
     )
     st.markdown("---")
 
+    # Đọc dữ liệu trực tiếp từ cơ sở dữ liệu SQLite
+    df_logs = get_logs_from_db()
+
     col1, col2, col3 = st.columns(3)
     col1.metric(
         "Tổng lượt tương tác ẩn danh",
-        len(st.session_state.interaction_logs),
-        "+3 phiên mới",
+        len(df_logs),
+        "Vĩnh viễn trên Database",
     )
+    
+    top_category = "Chưa có dữ liệu"
+    if not df_logs.empty and "category" in df_logs.columns and len(df_logs["category"]) > 0:
+      top_category = df_logs["category"].mode()[0]
+      
     col2.metric(
         "Chủ đề học sinh quan tâm nhất",
-        "Nhận diện ma túy trá hình",
+        top_category,
         "Chiếm đa số",
     )
     col3.metric("Cảnh báo tâm lý cần lưu ý", "1 trường hợp", "Cần đồng hành")
@@ -229,7 +232,6 @@ if "Admin" in mode_selection:
     st.markdown(
         "### 📈 Biểu đồ phân bổ nhu cầu tư vấn & tra cứu của học sinh"
     )
-    df_logs = pd.DataFrame(st.session_state.interaction_logs)
 
     if not df_logs.empty:
       category_counts = df_logs["category"].value_counts()
@@ -241,10 +243,10 @@ if "Admin" in mode_selection:
       st.dataframe(df_logs, use_container_width=True)
 
       st.info(
-          "💡 **Bảo mật tuyệt đối:** Dữ liệu học sinh được ẩn danh hoàn toàn, giúp"
-          " nhà trường nắm bắt xu hướng tâm lý và mối lo ngại để định hướng giáo"
-          " dục kịp thời."
+          "💡 **Bảo mật tuyệt đối:** Dữ liệu học sinh được lưu trữ an toàn trong cơ sở dữ liệu SQLite cục bộ, không bị mất khi khởi động lại hệ thống."
       )
+    else:
+      st.info("Chưa có lịch sử tương tác nào được ghi nhận.")
 
   elif admin_password_input != "":
     st.error(
@@ -258,7 +260,7 @@ if "Admin" in mode_selection:
 
   st.stop()
 
-# --- 12. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
+# --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
   st.session_state.messages = [{
       "role": "assistant",
@@ -295,39 +297,50 @@ if prompt := st.chat_input(
   ):
     category = "Nhận diện ma túy trá hình"
 
-  st.session_state.interaction_logs.append({
-      "timestamp": current_time,
-      "category": category,
-      "content": prompt,
-  })
+  # Ghi lại lịch sử tương tác vào cơ sở dữ liệu SQLite vĩnh viễn
+  add_log_to_db(current_time, category, prompt)
 
   with st.chat_message("assistant"):
     message_placeholder = st.empty()
-    # Hiển thị đúng thông báo đang phân tích theo yêu cầu
     message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
     try:
-      # Gửi tin nhắn gọn nhẹ thông qua Chat Session đã lưu sẵn ngữ cảnh tài liệu trên server
-      response = st.session_state.chat_session.send_message(prompt)
+      formatted_history = []
+      recent_messages = st.session_state.messages[-5:-1]
+      for m in recent_messages:
+        role_mapping = "user" if m["role"] == "user" else "model"
+        formatted_history.append(
+            types.Content(
+                role=role_mapping, parts=[types.Part.from_text(text=m["content"])]
+            )
+        )
+
+      contents = preloaded_files + formatted_history + [prompt]
+
+      response = client.models.generate_content(
+          model="gemini-2.5-flash",
+          contents=contents,
+          config=types.GenerateContentConfig(
+              system_instruction=system_instruction,
+              temperature=0.2,
+          ),
+      )
+      
       answer = response.text
       message_placeholder.markdown(answer)
       st.session_state.messages.append({"role": "assistant", "content": answer})
+      
     except Exception as e:
-      # Nếu có sự cố kết nối, tự động tạo mới lại phiên chat ngầm và gửi lại yêu cầu để người dùng không gặp lỗi gián đoạn
       try:
-        st.session_state.chat_session = client.chats.create(
+        time.sleep(1)
+        response = client.models.generate_content(
             model="gemini-3.8-flash",
+            contents=[prompt],
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 temperature=0.2,
             ),
         )
-        if preloaded_files:
-          st.session_state.chat_session.send_message(preloaded_files + [prompt])
-        else:
-          st.session_state.chat_session.send_message(prompt)
-          
-        response = st.session_state.chat_session.send_message(prompt)
         answer = response.text
         message_placeholder.markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
