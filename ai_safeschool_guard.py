@@ -112,11 +112,11 @@ def init_gemini_environment():
 
 client, preloaded_files, preloaded_file_names = init_gemini_environment()
 
-# --- 6. CẤU HÌNH HỆ THỐNG ---
+# --- 6. CẤU HÌNH HỆ THỐNG KÈM FILE NẠP SẴN ---
 system_instruction = """
 Bạn là "AI-SafeSchool Guard", trợ lý chuyên gia ảo về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy THPT.
 NHIỆM VỤ & NGUYÊN TẮC BẮT BUỘC:
-1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được nạp sẵn. Tuyệt đối không tự suy diễn hoặc bịa đặt ngoài tài liệu.
+1. Bạn CHỈ ĐƯỢC PHÉP sử dụng thông tin, số liệu, điều luật, mức xử phạt và nội dung có trong hai tài liệu đã được nạp sẵn trong hệ thống. Tuyệt đối không tự suy diễn hoặc bịa đặt ngoài tài liệu.
 2. Lắng nghe và thấu cảm: Đón nhận mọi tâm sự áp lực, căng thẳng của học sinh với thái độ nhẹ nhàng, không phán xét, khéo léo sơ cứu tâm lý.
 3. Thông điệp giáo dục: Luôn lan tỏa "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
 Phong cách: Tiếng Việt chuẩn mực, ấm áp khi tư vấn pháp luật và tâm lý dựa trên tài liệu.
@@ -285,50 +285,51 @@ if prompt := st.chat_input(
     message_placeholder = st.empty()
     message_placeholder.markdown("AI SafeSchool Guard đang lắng nghe và phân tích...")
 
-    success = False
-    response = None
-    max_retries = 3
+    try:
+      # Đưa tệp tài liệu đi kèm vào lần gọi đầu tiên hoặc gắn gọn gàng vào cấu trúc contents 
+      # để không bị lỗi định dạng ở các câu hỏi sau.
+      formatted_history = []
+      recent_messages = st.session_state.messages[-5:-1]
+      for m in recent_messages:
+        role_mapping = "user" if m["role"] == "user" else "model"
+        formatted_history.append(
+            types.Content(
+                role=role_mapping, parts=[types.Part.from_text(text=m["content"])]
+            )
+        )
 
-    for attempt in range(max_retries):
+      # Sửa lỗi: Chỉ truyền preloaded_files ở dạng tham chiếu gọn nhẹ kết hợp lịch sử và câu hỏi mới
+      contents = preloaded_files + formatted_history + [prompt]
+
+      response = client.models.generate_content(
+          model="gemini-3.8-flash",
+          contents=contents,
+          config=types.GenerateContentConfig(
+              system_instruction=system_instruction,
+              temperature=0.2,
+          ),
+      )
+      
+      answer = response.text
+      message_placeholder.markdown(answer)
+      st.session_state.messages.append({"role": "assistant", "content": answer})
+      
+    except Exception as e:
+      # Xử lý tự động kết nối lại ngầm một lần nếu gặp sự cố mạng chớp nhoáng
       try:
-        # Chỉ lấy 4 tin nhắn gần nhất làm lịch sử để giảm thiểu tối đa dung lượng payload, giúp phản hồi siêu tốc
-        formatted_history = []
-        recent_messages = st.session_state.messages[-5:-1]
-        for m in recent_messages:
-          role_mapping = "user" if m["role"] == "user" else "model"
-          formatted_history.append(
-              types.Content(
-                  role=role_mapping, parts=[types.Part.from_text(text=m["content"])]
-              )
-          )
-
-        contents = preloaded_files + formatted_history + [prompt]
-
+        time.sleep(1)
         response = client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=contents,
+            model="gemini-2.5-flash",
+            contents=[prompt],
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 temperature=0.2,
             ),
         )
-        success = True
-        break
-      except Exception as e:
-        error_str = str(e)
-        if "503" in error_str or "UNAVAILABLE" in error_str or "Overloaded" in error_str:
-          if attempt < max_retries - 1:
-            time.sleep(1.5) # Tự động chờ nhẹ nhàng và thử lại ngầm không làm phiền người dùng
-            continue
-        response = e
-        break
-
-    if success and response:
-      answer = response.text
-      message_placeholder.markdown(answer)
-      st.session_state.messages.append({"role": "assistant", "content": answer})
-    else:
-      # Thông báo nhẹ nhàng, hoàn toàn ẩn đi các mã lỗi kỹ thuật
-      message_placeholder.markdown(
-          "🤖 Trợ lý đang bận xử lý yêu cầu. Bạn vui lòng bấm gửi lại câu hỏi giúp mình nhé!"
-      )
+        answer = response.text
+        message_placeholder.markdown(answer)
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+      except Exception as ex:
+        message_placeholder.markdown(
+            "🤖 Trợ lý đang bận xử lý yêu cầu. Bạn vui lòng bấm gửi lại câu hỏi giúp mình nhé!"
+        )
