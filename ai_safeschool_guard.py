@@ -216,10 +216,22 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
         "content": prompt
     })
 
+    # --- TỐI ƯU TỐC ĐỘ: LỌC TỪ KHÓA ĐỂ XÁC ĐỊNH CÓ CẦN GỬI KÈM FILE TÀI LIỆU HAY KHÔNG ---
+    keyword_triggers = [
+        "luật", "phạt", "quy định", "ma tuý", "chất", "hướng thần", 
+        "thuốc lá điện tử", "bánh", "kẹo", "nước vui", "nghị định", "điều", "tội", "hút", "sai phạm"
+    ]
+    need_docs = any(kw in prompt.lower() for kw in keyword_triggers)
+
+    # Nếu hỏi về luật/ma túy -> Đính kèm file. Nếu tâm sự/chào hỏi -> Chỉ gửi prompt (phản hồi siêu tốc)
+    if need_docs and len(preloaded_files) > 0:
+        contents = preloaded_files + [prompt]
+    else:
+        contents = [prompt]
+
     with st.chat_message("assistant"):
-        with st.spinner("AI-SafeSchool Guard đang lắng nghe và phân tích..."):
+        with st.spinner("AI-SafeSchool Guard đang phản hồi..."):
             try:
-                contents = preloaded_files + [prompt]
                 response = client.models.generate_content(
                     model='gemini-3.8-flash',
                     contents=contents,
