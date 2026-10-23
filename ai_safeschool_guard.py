@@ -19,7 +19,7 @@ try:
 except Exception:
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-3.8-flash"
 MAX_API_ATTEMPTS = 3
 
 if not GEMINI_API_KEY:
