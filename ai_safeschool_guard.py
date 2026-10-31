@@ -16,69 +16,17 @@ DEFAULT_DOCS = [
     "Luật tra cứu liên quan về ma tuý.pdf"
 ]
 
-# --- 2. HỆ THỐNG LƯU TRỮ TẬP TRUNG ĐA THIẾT BỊ (PERSISTENT LOGGING) ---
+# File CSV lưu trữ tập trung cho tất cả thiết bị
 LOG_FILE = "safeschool_logs.csv"
 
-def init_logs_file():
-    """Tạo file dữ liệu nhật ký chung nếu chưa tồn tại"""
-    if not os.path.exists(LOG_FILE):
-        df_init = pd.DataFrame([
-            {
-                "timestamp": "2026-10-18 08:30",
-                "category": "Pháp luật & Xử phạt",
-                "sub_label": "Tra cứu trách nhiệm pháp lý & Xử phạt",
-                "content": "Hỏi về mức xử phạt tàng trữ thuốc lá điện tử trong trường học."
-            },
-            {
-                "timestamp": "2026-10-18 09:15",
-                "category": "Tâm lý học đường",
-                "sub_label": "Áp lực học tập & Kỳ vọng gia đình",
-                "content": "Chia sẻ áp lực học tập và cảm giác căng thẳng trước kỳ thi."
-            },
-            {
-                "timestamp": "2026-10-18 10:20",
-                "category": "Nhận diện ma túy trá hình",
-                "sub_label": "Ma túy trá hình thực phẩm / đồ uống",
-                "content": "Tra cứu thông tin về hình thức bánh lười và kẹo cần sa."
-            },
-        ])
-        df_init.to_csv(LOG_FILE, index=False, encoding="utf-8-sig")
-
-def load_logs():
-    """Đọc toàn bộ dữ liệu nhật ký tập trung từ tất cả các thiết bị"""
-    init_logs_file()
-    try:
-        df = pd.read_csv(LOG_FILE, encoding="utf-8-sig")
-        # Đảm bảo có đầy đủ các cột bắt buộc
-        for col in ["timestamp", "category", "sub_label", "content"]:
-            if col not in df.columns:
-                df[col] = ""
-        return df
-    except Exception as e:
-        print(f"Lỗi khi đọc file nhật ký: {e}")
-        return pd.DataFrame(columns=["timestamp", "category", "sub_label", "content"])
-
-def append_log(timestamp, category, sub_label, content):
-    """Ghi thêm câu hỏi mới từ bất kỳ thiết bị nào vào file tập trung"""
-    init_logs_file()
-    try:
-        with open(LOG_FILE, mode="a", newline="", encoding="utf-8-sig") as f:
-            writer = csv.writer(f)
-            writer.writerow([timestamp, category, sub_label, content])
-    except Exception as e:
-        print(f"Lỗi khi ghi file nhật ký: {e}")
-
-# Khởi tạo file log ngay khi máy chủ/ứng dụng chạy
-init_logs_file()
-
-# --- 3. CẤU HÌNH TRANG WEB ---
+# --- 2. CẤU HÌNH TRANG WEB ---
 st.set_page_config(
     page_title="AI-SafeSchool Guard - Hệ sinh thái An toàn Học đường",
     page_icon="🛡️",
     layout="wide"
 )
 
-# --- 4. HÀM MÃ HÓA ẢNH NỀN BASE64 ---
+# --- 3. HÀM MÃ HÓA ẢNH NỀN BASE64 ---
 def get_base64_of_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as f:
@@ -88,7 +36,7 @@ def get_base64_of_image(image_path):
 
 img_base64 = get_base64_of_image("background.png")
 
-# --- 5. CSS TÙY CHỈNH ---
+# --- 4. CSS TÙY CHỈNH ---
 custom_css = f"""
 <style>
 .stApp {{
@@ -136,14 +84,14 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# Kiểm tra API Key Gemini
+# Khởi tạo Gemini Client
 if not API_KEY:
-    st.error("Chưa tìm thấy GEMINI_API_KEY trong Streamlit Secrets! Vui lòng cấu hình biến môi trường.")
+    st.error("Chưa tìm thấy GEMINI_API_KEY trong Streamlit Secrets!")
     st.stop()
 
 client = genai.Client(api_key=API_KEY)
 
-# --- 6. TỰ ĐỘNG NẠP FILE TÀI LIỆU ---
+# --- 5. TỰ ĐỘNG NẠP FILE TÀI LIỆU ---
 @st.cache_resource
 def load_default_documents():
     processed = []
@@ -164,38 +112,66 @@ def load_default_documents():
 loaded_docs_info = load_default_documents()
 preloaded_files = [item[1] for item in loaded_docs_info]
 
-# --- 7. HÀM PHÂN LOẠI NHÃN ĐA TẦNG ---
+# --- 6. HỆ THỐNG LƯU TRỮ VÀ PHÂN LOẠI NHÃN DÙNG CHUNG ĐA THIẾT BỊ ---
+def init_logs_file():
+    """Tạo file dữ liệu nhật ký ban đầu nếu chưa tồn tại"""
+    if not os.path.exists(LOG_FILE):
+        df_init = pd.DataFrame([
+            {"timestamp": "2026-10-18 08:30", "category": "Pháp luật & Xử phạt", "sub_label": "Tra cứu trách nhiệm pháp lý & Xử phạt", "content": "Hỏi về mức xử phạt tàng trữ thuốc lá điện tử trong trường học."},
+            {"timestamp": "2026-10-18 09:15", "category": "Tâm lý học đường", "sub_label": "Áp lực học tập & Kỳ vọng gia đình", "content": "Chia sẻ áp lực học tập và cảm giác căng thẳng trước kỳ thi."},
+            {"timestamp": "2026-10-18 10:20", "category": "Nhận diện ma túy trá hình", "sub_label": "Ma túy trá hình thực phẩm / đồ uống", "content": "Tra cứu thông tin về hình thức bánh lười và kẹo cần sa."},
+            {"timestamp": "2026-10-31 15:57", "category": "Tâm lý học đường", "sub_label": "Áp lực học tập & Kỳ vọng gia đình", "content": "Tôi cảm thấy cuộc sống quá áp lực"},
+            {"timestamp": "2026-10-31 15:58", "category": "Tệ nạn & Ma túy mới", "sub_label": "Bị rủ rê / Ép buộc thử chất lạ", "content": "Có người đã từng nói với em là thử 1 viên thuốc lắc sẽ hết buồn"},
+            {"timestamp": "2026-10-31 15:59", "category": "Tệ nạn & Ma túy mới", "sub_label": "Bị rủ rê / Ép buộc thử chất lạ", "content": "Vậy nên làm gì khi có người cố tình rủ rê lôi kéo em?"},
+            {"timestamp": "2026-10-31 16:00", "category": "Tâm lý học đường", "sub_label": "Mâu thuẫn bạn bè / Bị cô lập, tẩy chay", "content": "bạn bè luôn xa lánh và cô lập em ở lớp"},
+        ])
+        df_init.to_csv(LOG_FILE, index=False, encoding="utf-8-sig")
+
+def load_logs():
+    """Đọc dữ liệu từ file chung của toàn bộ thiết bị"""
+    init_logs_file()
+    try:
+        return pd.read_csv(LOG_FILE, encoding="utf-8-sig")
+    except Exception:
+        return pd.DataFrame(columns=["timestamp", "category", "sub_label", "content"])
+
+def append_log(timestamp, category, sub_label, content):
+    """Ghi thêm một bản ghi từ bất kỳ thiết bị nào vào file chung"""
+    init_logs_file()
+    try:
+        with open(LOG_FILE, mode="a", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow([timestamp, category, sub_label, content])
+    except Exception as e:
+        print(f"Lỗi ghi nhật ký: {e}")
+
+init_logs_file()
+
 def classify_interaction(text):
-    """Bóc tách chính xác Nhóm chính (Category) và Nhãn con (Sub-label)"""
+    """Bóc tách chính xác Nhóm chính và Nhãn con từ nội dung học sinh trao đổi"""
     t = text.lower()
     
-    # 1. Bị rủ rê, lôi kéo, ép thử
     if any(k in t for k in ["rủ", "ép", "dụ dỗ", "lôi kéo", "thử 1 viên", "thử một viên", "cho thử"]):
         return "Tệ nạn & Ma túy mới", "Bị rủ rê / Ép buộc thử chất lạ"
     
-    # 2. Thuốc lá điện tử, Vape, Pod
     if any(k in t for k in ["thuốc lá điện tử", "pod", "vape", "hút pod", "hút thuốc lá", "tinh dầu"]):
         return "Tệ nạn & Ma túy mới", "Thuốc lá điện tử (Pod / Vape)"
     
-    # 3. Ma túy trá hình (bánh lười, nước vui, tem giấy...)
     if any(k in t for k in ["bánh lười", "nước vui", "kẹo", "viên", "bùa lưỡi", "tem giấy", "trà sữa", "chất lạ"]):
         return "Nhận diện ma túy trá hình", "Ma túy trá hình thực phẩm / đồ uống"
         
-    # 4. Bị tẩy chay, cô lập, bạo lực tinh thần
     if any(k in t for k in ["xa lánh", "cô lập", "tẩy chay", "bạn bè không chơi", "ghét bỏ", "bị bắt nạt", "nói xấu"]):
         return "Tâm lý học đường", "Mâu thuẫn bạn bè / Bị cô lập, tẩy chay"
         
-    # 5. Áp lực thi cử, học tập, kỳ vọng cha mẹ
     if any(k in t for k in ["áp lực", "căng thẳng", "stress", "học tập", "điểm số", "kỳ vọng", "bố mẹ mắng", "mệt mỏi", "bế tắc", "chán sống"]):
         return "Tâm lý học đường", "Áp lực học tập & Kỳ vọng gia đình"
         
-    # 6. Khung hình phạt, luật pháp
     if any(k in t for k in ["luật", "phạt", "tù", "tội", "bị bắt", "công an", "nghị định", "điều khoản", "tàng trữ", "xử lý"]):
         return "Pháp luật & Xử phạt", "Tra cứu trách nhiệm pháp lý & Xử phạt"
         
     return "Tâm lý học đường", "Tâm sự & Giải tỏa cảm xúc cá nhân"
 
-# --- 8. THANH BÊN (SIDEBAR) ---
+# --- 7. THANH BÊN (SIDEBAR) ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2910/2910795.png", width=60)
     st.markdown("### 🛡️ AI-SafeSchool Guard")
@@ -213,7 +189,7 @@ with st.sidebar:
     st.markdown("---")
     st.info("💡 Trợ lý AI sẵn sàng hỗ trợ tâm lý, pháp luật cho học sinh 24/7.")
 
-# --- 9. TIÊU ĐỀ & CHỌN CHẾ ĐỘ ---
+# --- 8. TIÊU ĐỀ & CHỌN CHẾ ĐỘ ---
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
 st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh báo sớm.")
 
@@ -224,7 +200,7 @@ mode_selection = st.radio(
 )
 st.markdown("---")
 
-# --- 10. NẾU CHỌN QUẢN TRỊ NHÀ TRƯỜNG ---
+# --- 9. NẾU CHỌN QUẢN TRỊ NHÀ TRƯỜNG ---
 if "Quản trị" in mode_selection:
     st.subheader("🔒 Bảng điều khiển Quản trị & Phân tích Dữ liệu")
     admin_password_input = st.text_input(
@@ -238,7 +214,6 @@ if "Quản trị" in mode_selection:
             st.success("🔓 Xác thực thành công! Phân tích xu hướng tâm lý & tệ nạn học đường thời gian thực:")
             st.markdown("---")
             
-            # ĐỌC TRỰC TIẾP TỪ FILE CHUNG ĐỂ LẤY TOÀN BỘ CÂU HỎI CỦA MỌI THIẾT BỊ
             df_logs = load_logs()
             
             if not df_logs.empty and "category" in df_logs.columns:
@@ -260,7 +235,7 @@ if "Quản trị" in mode_selection:
                         "Mâu thuẫn bạn bè / Bị cô lập, tẩy chay"
                     ])])
 
-                # 3 Chỉ số cập nhật tự động thời gian thực từ dữ liệu toàn trường
+                # 3 Chỉ số đầu trang cập nhật tự động
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Tổng lượt trao đổi ẩn danh", f"{total_logs} lượt", f"+{total_logs} phản ánh")
                 col2.metric("Chủ đề học sinh quan tâm nhất", top_category, f"Chiếm {pct_top_category}% ({top_category_count} lượt)")
@@ -268,7 +243,7 @@ if "Quản trị" in mode_selection:
 
                 st.markdown("---")
                 
-                # Biểu đồ phân bổ nhu cầu theo các mảng
+                # Biểu đồ phân bổ nhu cầu theo các mảng lớn
                 st.markdown("### 📊 Nhu cầu theo các mảng")
                 st.bar_chart(cat_counts)
 
@@ -277,17 +252,15 @@ if "Quản trị" in mode_selection:
                 st.markdown("### 📋 Nhật ký tương tác ẩn danh thời gian thực (Real-time Logs)")
                 st.dataframe(df_logs, use_container_width=True)
 
-                # Nút tải file báo cáo CSV
+                # Nút tải dữ liệu nhật ký CSV
                 st.download_button(
-                    label="📥 Xuất báo cáo dữ liệu CSV",
+                    "📥 Xuất dữ liệu nhật ký (CSV)",
                     data=df_logs.to_csv(index=False).encode("utf-8-sig"),
-                    file_name="nhat_ky_tu_van_hoc_sinh.csv",
+                    file_name="safeschool_interaction_logs.csv",
                     mime="text/csv",
-                    use_container_width=False
                 )
-
             else:
-                st.info("Chưa có dữ liệu tương tác nào được ghi nhận.")
+                st.info("Chưa có dữ liệu tương tác để phân tích.")
         else:
             st.error("❌ Mật khẩu không chính xác! Vui lòng nhập lại.")
     else:
@@ -295,20 +268,20 @@ if "Quản trị" in mode_selection:
         
     st.stop()
 
-# --- 11. CẤU HÌNH NHÂN DẠNG HỆ THỐNG ---
+# --- 10. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TỐI ƯU SÚC TÍCH, ĐỦ Ý) ---
 system_instruction = """
-Bạn là "AI-SafeSchool Guard", một trợ lý chuyên gia ảo thông minh, thấu cảm về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy trong cơ sở giáo dục THPT.
+Bạn là "AI-SafeSchool Guard", trợ lý ảo thông minh, thấu cảm hỗ trợ tâm lý học đường, tư vấn pháp luật và phòng ngừa tệ nạn ma túy cho học sinh THPT.
 
-Nhiệm vụ và phong cách của bạn:
-1. **Lắng nghe và Thấu cảm (Sơ cứu tâm lý):** Khi học sinh chia sẻ về áp lực học tập, căng thẳng, buồn chán, cô đơn hoặc các mối quan hệ, hãy luôn đón nhận bằng sự thấu hiểu, nhẹ nhàng, không phán xét. Động viên các em và đưa ra lời khuyên tích cực để giải tỏa cảm xúc.
-2. **Nhận diện nguy cơ sớm:** Tinh tế nhận ra các dấu hiệu học sinh đang tìm cách giải tỏa áp lực bằng những con đường sai lầm (như thử chất lạ, tìm quên trong khói thuốc, nghe lời rủ rê...), từ đó khéo léo cảnh báo hiểm họa.
-3. **Tra cứu pháp luật chính xác:** Trả lời cực kỳ chính xác dựa trên nội dung các file tài liệu đã được nạp sẵn trong hệ thống (Luật Phòng, chống ma túy, các mức xử phạt hành chính, hình sự, nhận diện ma túy mới/trá hình như nước vui, bánh lười, thuốc lá điện tử, bùa lưỡi...).
-4. **Thông điệp giáo dục:** Luôn lan tỏa thông điệp: "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
-
-Phong cách: Tiếng Việt chuẩn mực, ấm áp, thấu hiểu khi trò chuyện tâm lý, nhưng đồng thời sắc sảo, vững vàng và có tính giáo dục cao khi tư vấn pháp luật.
+QUY TẮC ĐỘ DÀI & ĐỊNH DẠNG (BẮT BUỘC):
+1. **Độ dài câu trả lời:** Tuyệt đối KHÔNG viết dài dòng như bài văn hay sao chép nguyên văn điều luật. Độ dài tối ưu từ 3 đến 5 câu (hoặc dưới 120 từ).
+2. **Bố cục 2 phần rõ ràng:**
+   - **Phần 1 - Đồng cảm / Lắng nghe (1-2 câu):** Chạm vào cảm xúc của học sinh một cách chân thành, ấm áp, không phán xét, động viên các em giải tỏa tâm lý.
+   - **Phần 2 - Giải pháp & Căn cứ pháp lý (2-3 gạch đầu dòng ngắn):** Nêu thẳng điều luật, mức phạt cốt lõi hoặc cách nhận diện nguy hiểm từ tài liệu đính kèm. Hướng dẫn bước xử lý thiết thực nhất.
+3. **Thông điệp cốt lõi:** Lồng ghép tự nhiên thông điệp: "Không thử, không giữ, không tham gia dù chỉ một lần" và "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài".
+4. **Phong cách:** Ngôn ngữ học đường gần gũi, chia đoạn thoáng mắt, đi thẳng vào câu trả lời.
 """
 
-# --- 12. GIAO DIỆN CHAT DÀNH CHO HỌC SINH ---
+# --- 11. GIAO DIỆN CHAT DÀNH CHO HỌC SINH ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Chào bạn! Tôi là **AI-SafeSchool Guard** – Người bạn đồng hành lắng nghe tâm sự, hỗ trợ giáo dục pháp luật và phòng ngừa tệ nạn ma túy học đường. Hôm nay bạn đang cảm thấy thế nào hoặc cần tra cứu vấn đề gì, hãy chia sẻ với tôi nhé!"}
@@ -319,16 +292,14 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví dụ: Tôi đang rất áp lực... hoặc Bánh lười là gì?)..."):
-    # Lưu tin nhắn vào session hiện tại của học sinh
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Tự động gán Nhóm chính và Nhãn con
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     category, sub_label = classify_interaction(prompt)
 
-    # GHI ĐỒNG BỘ VÀO FILE TẬP TRUNG TOÀN HỆ THỐNG ĐỂ THIẾT BỊ NÀO CŨNG GHI ĐƯỢC
+    # Ghi dữ liệu đồng bộ vào file CSV dùng chung cho mọi thiết bị
     append_log(
         timestamp=current_time,
         category=category,
@@ -336,7 +307,7 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
         content=prompt
     )
 
-    # Lọc từ khóa để gửi kèm tài liệu khi cần tra cứu
+    # Lọc từ khóa để gửi kèm tài liệu khi cần
     keyword_triggers = [
         "luật", "phạt", "quy định", "ma tuý", "chất", "hướng thần", 
         "thuốc lá điện tử", "bánh", "kẹo", "nước vui", "nghị định", "điều", "tội", "hút", "sai phạm"
@@ -348,7 +319,7 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
         for pf in preloaded_files:
             api_contents.append(pf)
 
-    # Giữ lại tối đa 6 lượt trao đổi gần nhất trong phiên
+    # Giữ lại tối đa 6 lượt trao đổi gần nhất để nhớ ngữ cảnh
     recent_messages = st.session_state.messages[-6:]
     for msg in recent_messages:
         api_role = "user" if msg["role"] == "user" else "model"
@@ -367,7 +338,8 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
                     contents=api_contents,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
-                        temperature=0.6,
+                        temperature=0.5,       # Nhiệt độ vừa phải giúp câu trả lời chuẩn xác, gãy gọn
+                        max_output_tokens=350, # Khóa giới hạn độ dài đầu ra dưới 150-200 từ
                     )
                 )
                 answer = response.text
