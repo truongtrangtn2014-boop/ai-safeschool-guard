@@ -12,8 +12,7 @@ if "GEMINI_API_KEY" in st.secrets:
 
 DEFAULT_DOCS = [
     "Tài liệu ma tuý học đường.docx",
-    "Luật tra cứu liên quan về ma tuý.pdf",
-    "Bộ Câu hỏi thi PCMT năm 2026- (gửi các trường).docx"
+    "Luật tra cứu liên quan về ma tuý.pdf"
 ]
 
 # --- 2. CẤU HÌNH TRANG WEB ---
@@ -81,7 +80,7 @@ h1, h2, h3, h4, h5, h6, p, span, label, div[data-testid="stMarkdownContainer"] {
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# --- 5. TỰ ĐỘNG NẠP NGẦM FILE TÀI LIỆU ---
+# --- 5. TỰ ĐỘNG NẠP NGẦM 2 FILE CỐ ĐỊNH ---
 client = genai.Client()
 
 @st.cache_resource
@@ -121,7 +120,7 @@ with st.sidebar:
     
     st.markdown("#### 📁 Kho tài liệu tích hợp")
     if len(preloaded_files) > 0:
-        st.success("✅ Đã nạp thành công tài liệu & Bộ câu hỏi PCMT 2026!")
+        st.success("✅ Đã nạp thành công tài liệu cho học sinh!")
         for name, _ in loaded_docs_info:
             st.markdown(f"- 📄 `{name}`")
     else:
@@ -134,6 +133,7 @@ with st.sidebar:
 st.title("🛡️ Trợ lý AI-SafeSchool Guard")
 st.markdown("##### Hệ thống hỗ trợ tâm lý học đường, tra cứu pháp luật & quản trị cảnh báo sớm.")
 
+# Tạo thanh chọn chế độ hiển thị rõ ràng ngay đầu trang
 mode_selection = st.radio(
     "📌 Chọn chế độ hệ thống:",
     ["💬 Giao diện Học sinh (Chat)", "📊 Bảng điều khiển Quản trị Nhà trường (Admin)"],
@@ -169,39 +169,36 @@ if "Quản trị" in mode_selection:
             st.info("💡 **Bảo mật tuyệt đối:** Dữ liệu học sinh được ẩn danh hoàn toàn, giúp nhà trường nắm bắt xu hướng tâm lý và mối lo ngại để định hướng giáo dục kịp thời.")
             
     elif admin_password_input != "":
-        st.error("❌ Mật khẩu không chính xác! Vuint lòng nhập lại đúng mật khẩu quản trị.")
+        st.error("❌ Mật khẩu không chính xác! Vui lòng nhập lại đúng mật khẩu quản trị.")
     else:
-        st.info("💡 Vui lòng nhập mật khẩu quản trị (`admin2026`) để mở bảng điều khiển phân tích số liệu.")
+        st.info("💡 Vui lòng nhập mật khẩu của quản trị để mở bảng điều khiển phân tích số liệu.")
         
-    st.stop()
+    st.stop() # Dừng lại không hiển thị giao diện chat bên dưới
 
-# --- 10. CẤU HÌNH NHÂN DẠNG & QUY TẮC NGẮN GỌN (SYSTEM INSTRUCTION) ---
+# --- 10. CẤU HÌNH NHÂN DẠNG HỆ THỐNG (TÂM LÝ & PHÁP LÝ) ---
 system_instruction = """
-Bạn là "AI-SafeSchool Guard", một trợ lý chuyên gia ảo thông minh, thấu cảm về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy trong cơ sở giáo dục THPT. Bạn nắm vững nội dung từ bộ câu hỏi thi phòng chống ma túy năm 2026 và các tài liệu pháp luật liên quan.
+Bạn là "AI-SafeSchool Guard", một trợ lý chuyên gia ảo thông minh, thấu cảm về giáo dục pháp luật, sơ cứu tâm lý học đường và phòng ngừa tệ nạn ma túy trong cơ sở giáo dục THPT.
 
-Nhiệm vụ của bạn:
-1. **Lắng nghe và Thấu cảm (Sơ cứu tâm lý):** Khi học sinh chia sẻ về áp lực, căng thẳng, buồn chán, hãy đón nhận nhẹ nhàng, không phán xét, đưa ra lời khuyên tích cực.
-2. **Nhận diện nguy cơ sớm:** Tinh tế nhận ra các dấu hiệu thử chất lạ, khéo léo cảnh báo hiểm họa.
-3. **Tra cứu pháp luật chính xác:** Trả lời chính xác dựa trên tài liệu đính kèm (Luật Phòng, chống ma túy, Bộ luật Hình sự, các Nghị định xử phạt vi phạm hành chính, nhận diện ma túy trá hình).
-4. **Thông điệp giáo dục:** Lan tỏa thông điệp: "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
+Nhiệm vụ và phong cách của bạn:
+1. **Lắng nghe và Thấu cảm (Sơ cứu tâm lý):** Khi học sinh chia sẻ về áp lực học tập, căng thẳng, buồn chán, cô đơn hoặc các mối quan hệ, hãy luôn đón nhận bằng sự thấu hiểu, nhẹ nhàng, không phán xét. Động viên các em và đưa ra lời khuyên tích cực để giải tỏa cảm xúc.
+2. **Nhận diện nguy cơ sớm:** Tinh tế nhận ra các dấu hiệu học sinh đang tìm cách giải tỏa áp lực bằng những con đường sai lầm (như thử chất lạ, tìm quên trong khói thuốc, nghe lời rủ rê...), từ đó khéo léo cảnh báo hiểm họa.
+3. **Tra cứu pháp luật chính xác:** Trả lời cực kỳ chính xác dựa trên nội dung các file tài liệu đã được nạp sẵn trong hệ thống (Luật Phòng, chống ma túy, các mức xử phạt hành chính, hình sự, nhận diện ma túy mới/trá hình như nước vui, bánh lười, thuốc lá điện tử, bùa lưỡi...).
+4. **Thông điệp giáo dục:** Luôn lan tỏa thông điệp: "Mỗi học sinh là một chiến sĩ, mỗi nhà trường là một pháo đài" và "Không giữ, không thử, không tham gia tổ chức sử dụng ma túy dù chỉ một lần".
 
-⚠️ **QUY TẮC BẮT BUỘC VỀ ĐỘ DÀI VÀ TRÌNH BÀY (RẤT QUAN TRỌNG):**
-- **Ngắn gọn, súc tích:** Tuyệt đối tránh trả lời dài dòng giống bài văn nghị luận. Đi thẳng vào trọng tâm câu hỏi.
-- **Sử dụng định dạng thoáng:** Ưu tiên dùng gạch đầu dòng (bullet points) ngắn gọn, xuống dòng rõ ràng để học sinh dễ đọc, dễ nắm bắt tại một cái nhìn đầu tiên.
-- **Độ dài vừa phải:** Giới hạn câu trả lời trong các ý chính cô đọng, tránh lan man.
+Phong cách: Tiếng Việt chuẩn mực, ấm áp, thấu hiểu khi trò chuyện tâm lý, nhưng đồng thời sắc sảo, vững vàng và có tính giáo dục cao khi tư vấn pháp luật.
 """
 
 # --- 11. GIAO DIỆN CHAT CHÍNH (DÀNH CHO HỌC SINH) ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Chào bạn! Tôi là **AI-SafeSchool Guard** – Người bạn đồng hành lắng nghe tâm sự, hỗ trợ giáo dục pháp luật và phòng ngừa tệ nạn ma túy học đường. Hôm nay bạn cần trao đổi hoặc tra cứu vấn đề gì, hãy chia sẻ với tôi nhé!"}
+        {"role": "assistant", "content": "Chào bạn! Tôi là **AI-SafeSchool Guard** – Người bạn đồng hành lắng nghe tâm sự, hỗ trợ giáo dục pháp luật và phòng ngừa tệ nạn ma túy học đường. Hôm nay bạn đang cảm thấy thế nào hoặc cần tra cứu vấn đề gì, hãy chia sẻ với tôi nhé!"}
     ]
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví dụ: Quy định về quản lý người sử dụng trái phép chất ma túy thế nào?)"):
+if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví dụ: Tôi đang rất áp lực... hoặc Thế nào là chất hướng thần?)"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -219,31 +216,32 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
         "content": prompt
     })
 
-    # --- TỐI ƯU TỐC ĐỘ: LỌC TỪ KHÓA ĐỂ GỬI KÈM TÀI LIỆU KHI CẦN THIẾT ---
+    # --- TỐI ƯU TỐC ĐỘ: LỌC TỪ KHÓA ĐỂ XÁC ĐỊNH CÓ CẦN GỬI KÈM FILE TÀI LIỆU HAY KHÔNG ---
     keyword_triggers = [
         "luật", "phạt", "quy định", "ma tuý", "chất", "hướng thần", 
-        "thuốc lá điện tử", "bánh", "kẹo", "nước vui", "nghị định", "điều", "tội", "hút", "sai phạm", "câu hỏi", "thi"
+        "thuốc lá điện tử", "bánh", "kẹo", "nước vui", "nghị định", "điều", "tội", "hút", "sai phạm"
     ]
     need_docs = any(kw in prompt.lower() for kw in keyword_triggers)
 
+    # Nếu hỏi về luật/ma túy -> Đính kèm file. Nếu tâm sự/chào hỏi -> Chỉ gửi prompt (phản hồi siêu tốc)
     if need_docs and len(preloaded_files) > 0:
         contents = preloaded_files + [prompt]
     else:
         contents = [prompt]
 
     with st.chat_message("assistant"):
-        with st.spinner("AI-SafeSchool Guard đang suy nghĩ phản hồi..."):
+        with st.spinner("AI-SafeSchool Guard đang lắng nghe và suy nghĩ phản hồi..."):
             try:
                 response = client.models.generate_content(
                     model='gemini-3.5-flash-lite',
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
-                        temperature=0.5,
+                        temperature=0.6,
                     )
                 )
                 answer = response.text
                 st.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             except Exception as e:
-                st.error(f"Mạng bị nghẽn, bạn hãy đợi 10-20s để trò chuyện tiếp nhé: {e}")
+                st.error(f"Mạng đi bị nghẽn bạn hãy đợi 10-20s để trò chuyện tiếp nhé: {e}")
