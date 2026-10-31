@@ -196,51 +196,39 @@ if "Quản trị" in mode_selection:
             
             df_logs = pd.DataFrame(st.session_state.interaction_logs)
             
-            if not df_logs.empty and "sub_label" in df_logs.columns:
+            if not df_logs.empty and "category" in df_logs.columns:
                 total_logs = len(df_logs)
                 
-                # Thống kê theo nhóm lớn và nhãn con cụ thể
+                # Thống kê theo các mảng lớn (category)
                 cat_counts = df_logs["category"].value_counts()
-                sub_counts = df_logs["sub_label"].value_counts()
                 
-                # Xác định nhãn con chiếm tỷ lệ cao nhất
-                top_sub_label = sub_counts.index[0]
-                top_sub_count = sub_counts.iloc[0]
-                pct_top_sub = int(round((top_sub_count / total_logs) * 100))
+                # Xác định mảng lớn chiếm tỷ lệ cao nhất
+                top_category = cat_counts.index[0]
+                top_category_count = cat_counts.iloc[0]
+                pct_top_category = int(round((top_category_count / total_logs) * 100))
                 
-                # Đếm trường hợp nguy cơ cao
-                risk_cases = len(df_logs[df_logs["sub_label"].isin([
-                    "Bị rủ rê / Ép buộc thử chất lạ", 
-                    "Mâu thuẫn bạn bè / Bị cô lập, tẩy chay"
-                ])])
+                # Đếm trường hợp nguy cơ cần can thiệp từ nhãn con
+                risk_cases = 0
+                if "sub_label" in df_logs.columns:
+                    risk_cases = len(df_logs[df_logs["sub_label"].isin([
+                        "Bị rủ rê / Ép buộc thử chất lạ", 
+                        "Mâu thuẫn bạn bè / Bị cô lập, tẩy chay"
+                    ])])
 
                 # 3 Chỉ số đầu trang
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Tổng lượt trao đổi ẩn danh", f"{total_logs} lượt", f"+{total_logs} phản ánh")
-                col2.metric("Vấn đề học sinh quan tâm nhất", top_sub_label, f"Chiếm {pct_top_sub}% ({top_sub_count} lượt)")
+                col2.metric("Chủ đề học sinh quan tâm nhất", top_category, f"Chiếm {pct_top_category}% ({top_category_count} lượt)")
                 col3.metric("Cảnh báo nguy cơ cần can thiệp", f"{risk_cases} trường hợp", "Cần đồng hành ngay")
 
                 st.markdown("---")
                 
-                # Bố cục 2 cột biểu đồ: Nhóm lớn vs Điểm nóng chi tiết
-                c_left, c_right = st.columns(2)
-                with c_left:
-                    st.markdown("### 📊 Nhu cầu theo mảng lớn")
-                    st.bar_chart(cat_counts)
-                
-                with c_right:
-                    st.markdown("### 🎯 Xu hướng chi tiết (Các nhãn con)")
-                    st.bar_chart(sub_counts)
-
-                # Bảng xếp hạng chi tiết nhãn con
-                st.markdown("### 📋 Bảng phân bổ chi tiết các vấn đề học sinh đang gặp phải")
-                df_sub_summary = sub_counts.reset_index()
-                df_sub_summary.columns = ["Vấn đề cụ thể (Nhãn con)", "Số lượt học sinh đề cập"]
-                df_sub_summary["Tỷ lệ (%)"] = (df_sub_summary["Số lượt học sinh đề cập"] / total_logs * 100).round(1).astype(str) + "%"
-                st.dataframe(df_sub_summary, hide_index=True, use_container_width=True)
+                # Biểu đồ phân bổ nhu cầu theo các mảng lớn
+                st.markdown("### 📊 Nhu cầu theo các mảng")
+                st.bar_chart(cat_counts)
 
                 st.markdown("---")
-                # Bảng nhật ký đầy đủ
+                # Bảng nhật ký tương tác thời gian thực
                 st.markdown("### 📋 Nhật ký tương tác ẩn danh thời gian thực (Real-time Logs)")
                 st.dataframe(df_logs, use_container_width=True)
 
