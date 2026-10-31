@@ -139,7 +139,7 @@ def classify_interaction(text):
         
     return "Tâm lý học đường", "Tâm sự & Giải tỏa cảm xúc cá nhân"
 
-# Khởi tạo dữ liệu mẫu ban đầu có sẵn cấu trúc sub_label
+# Khởi tạo dữ liệu ban đầu
 if "interaction_logs" not in st.session_state:
     st.session_state.interaction_logs = [
         {"timestamp": "2026-10-18 08:30", "category": "Pháp luật & Xử phạt", "sub_label": "Tra cứu trách nhiệm pháp lý & Xử phạt", "content": "Hỏi về mức xử phạt tàng trữ thuốc lá điện tử trong trường học."},
@@ -182,7 +182,7 @@ st.markdown("---")
 
 # --- 9. NẾU CHỌN QUẢN TRỊ NHÀ TRƯỜNG ---
 if "Quản trị" in mode_selection:
-    st.subheader("🔒 Bảng điều khiển Quản trị & Định hướng Tuyên truyền")
+    st.subheader("🔒 Bảng điều khiển Quản trị & Phân tích Dữ liệu")
     admin_password_input = st.text_input(
         "Nhập mật khẩu quản trị hệ thống:",
         type="password",
@@ -214,7 +214,7 @@ if "Quản trị" in mode_selection:
                     "Mâu thuẫn bạn bè / Bị cô lập, tẩy chay"
                 ])])
 
-                # 3 Chỉ số đầu trang cập nhật hoàn toàn tự động
+                # 3 Chỉ số đầu trang
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Tổng lượt trao đổi ẩn danh", f"{total_logs} lượt", f"+{total_logs} phản ánh")
                 col2.metric("Vấn đề học sinh quan tâm nhất", top_sub_label, f"Chiếm {pct_top_sub}% ({top_sub_count} lượt)")
@@ -239,43 +239,7 @@ if "Quản trị" in mode_selection:
                 df_sub_summary["Tỷ lệ (%)"] = (df_sub_summary["Số lượt học sinh đề cập"] / total_logs * 100).round(1).astype(str) + "%"
                 st.dataframe(df_sub_summary, hide_index=True, use_container_width=True)
 
-                # --- ĐỀ XUẤT NỘI DUNG CHỦ ĐỀ CHO NHÀ TRƯỜNG & ĐOÀN ĐỘI ---
                 st.markdown("---")
-                st.markdown("### 📢 Đề xuất Nội dung Tuyên truyền & Kế hoạch Can thiệp")
-                
-                action_plan = ""
-                if "rủ rê" in top_sub_label.lower():
-                    action_plan = """
-                    - **Chủ đề sinh hoạt dưới cờ / Khóa:** *"Bản lĩnh trước sự lôi kéo: Nhận diện ma túy ngụy trang và kỹ năng từ chối dứt khoát"*.
-                    - **Chương trình Phát thanh Măng non:** Phát phóng sự ngắn về *"Áp lực đồng trang lứa (Peer pressure) và 3 bước nói 'KHÔNG' khi bị bạn bè rủ rê dùng chất lạ"*.
-                    - **Hành động can thiệp:** Giáo viên chủ nhiệm kết hợp Đoàn trường rà soát các nhóm học sinh có biểu hiện lôi kéo tại khu vực cổng trường.
-                    """
-                elif "cô lập" in top_sub_label.lower():
-                    action_plan = """
-                    - **Chủ đề sinh hoạt dưới cờ / Khóa:** *"Xây dựng tình bạn đẹp - Nói không với cô lập tinh thần và bạo lực học đường"*.
-                    - **Chương trình Phát thanh Măng non:** Chia sẻ chuyên mục *"Thấu hiểu và sẻ chia: Đừng để giảng đường trở thành ốc đảo cô đơn của bạn mình"*.
-                    - **Hành động can thiệp:** Phòng Tư vấn tâm lý chủ động gặp gỡ riêng các trường hợp có dấu hiệu thu mình để hỗ trợ hòa nhập.
-                    """
-                elif "áp lực" in top_sub_label.lower():
-                    action_plan = """
-                    - **Chủ đề sinh hoạt dưới cờ / Khóa:** *"Giải tỏa căng thẳng thi cử và phương pháp quản trị kỳ vọng tuổi học trò"*.
-                    - **Chương trình Phát thanh Măng non:** Hướng dẫn *"Phương pháp học tập Pomodoro, kỹ thuật hít thở sâu giảm stress và danh bạ hỗ trợ tâm lý"*.
-                    - **Hành động can thiệp:** Phối hợp cùng Ban đại diện phụ huynh điều chỉnh thời lượng học thêm, giảm tải áp lực điểm số.
-                    """
-                elif "trá hình" in top_sub_label.lower() or "thuốc lá" in top_sub_label.lower():
-                    action_plan = """
-                    - **Chủ đề sinh hoạt dưới cờ / Khóa:** *"Hiểm họa từ thuốc lá điện tử, Pod Chill và các dạng ma túy 'núp bóng' bánh kẹo"*.
-                    - **Chương trình Phát thanh Măng non:** Bản tin cảnh báo *"Cách nhận biết nước vui, bánh lười và các hóa chất hướng thần độc hại"*.
-                    - **Hành động can thiệp:** Tăng cường kiểm tra đột xuất đồ dùng cá nhân và thiết lập hòm thư tố giác ẩn danh.
-                    """
-                else:
-                    action_plan = """
-                    - **Chủ đề sinh hoạt dưới cờ / Khóa:** *"Tuân thủ pháp luật vì một môi trường học đường không ma túy"*.
-                    - **Chương trình Phát thanh Măng non:** Tuyên truyền các khung chế tài xử phạt theo Luật Phòng, chống ma túy.
-                    """
-
-                st.info(f"💡 **Căn cứ từ số liệu thực tế - Vấn đề nổi cộm nhất là [{top_sub_label}]:**\n{action_plan}")
-
                 # Bảng nhật ký đầy đủ
                 st.markdown("### 📋 Nhật ký tương tác ẩn danh thời gian thực (Real-time Logs)")
                 st.dataframe(df_logs, use_container_width=True)
@@ -340,7 +304,7 @@ if prompt := st.chat_input("Nhập tâm sự hoặc câu hỏi của bạn (ví 
         for pf in preloaded_files:
             api_contents.append(pf)
 
-    # Giữ lại tối đa 6 lượt trao đổi gần nhất để giữ ngữ cảnh liền mạch
+    # Giữ lại tối đa 6 lượt trao đổi gần nhất
     recent_messages = st.session_state.messages[-6:]
     for msg in recent_messages:
         api_role = "user" if msg["role"] == "user" else "model"
